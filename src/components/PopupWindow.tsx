@@ -1,15 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { readText } from '@tauri-apps/plugin-clipboard-manager';
-import { loadConfig, streamAiResponse, hidePopupWindow } from '../api';
-import type { AppConfig } from '../types';
-import './PopupWindow.css';
+import React, { useState, useEffect } from "react";
+import {
+  loadConfig,
+  streamAiResponse,
+  hidePopupWindow,
+  getCapturedText,
+} from "../api";
+import type { AppConfig } from "../types";
+import "./PopupWindow.css";
 
 export default function PopupWindow() {
   const [config, setConfig] = useState<AppConfig | null>(null);
-  const [selectedText, setSelectedText] = useState('');
-  const [customPrompt, setCustomPrompt] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
-  const [response, setResponse] = useState('');
+  const [selectedText, setSelectedText] = useState("");
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [response, setResponse] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,14 +27,14 @@ export default function PopupWindow() {
       const loadedConfig = await loadConfig();
       setConfig(loadedConfig);
 
-      // Read clipboard for selected text
-      const clipboardText = await readText();
-      if (clipboardText) {
-        setSelectedText(clipboardText);
+      // Get captured text from state (already captured by hotkey handler)
+      const capturedText = await getCapturedText();
+      if (capturedText) {
+        setSelectedText(capturedText);
       }
     } catch (err) {
-      console.error('Failed to initialize popup:', err);
-      setError('Failed to initialize. Please try again.');
+      console.error("Failed to initialize popup:", err);
+      setError("Failed to initialize. Please try again.");
     }
   };
 
@@ -39,26 +43,26 @@ export default function PopupWindow() {
 
     const selectedModel = config.models[config.selected_model_index];
     if (!selectedModel.api_key) {
-      setError('Please configure an API key in settings first.');
+      setError("Please configure an API key in settings first.");
       return;
     }
 
     // Determine the prompt to use
-    let finalPrompt = '';
+    let finalPrompt = "";
     if (selectedTemplate) {
-      const template = config.templates.find(t => t.id === selectedTemplate);
+      const template = config.templates.find((t) => t.id === selectedTemplate);
       if (template) {
         finalPrompt = `${template.prompt}\n\n${selectedText}`;
       }
     } else if (customPrompt.trim()) {
       finalPrompt = `${customPrompt}\n\n${selectedText}`;
     } else {
-      setError('Please select a template or enter a custom prompt.');
+      setError("Please select a template or enter a custom prompt.");
       return;
     }
 
     setIsStreaming(true);
-    setResponse('');
+    setResponse("");
     setError(null);
 
     try {
@@ -76,11 +80,11 @@ export default function PopupWindow() {
         },
         () => {
           setIsStreaming(false);
-        }
+        },
       );
     } catch (err) {
-      console.error('Stream error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to get response');
+      console.error("Stream error:", err);
+      setError(err instanceof Error ? err.message : "Failed to get response");
       setIsStreaming(false);
     }
   };
@@ -93,9 +97,9 @@ export default function PopupWindow() {
     if (response) {
       try {
         await navigator.clipboard.writeText(response);
-        alert('Response copied to clipboard!');
+        alert("Response copied to clipboard!");
       } catch (err) {
-        console.error('Failed to copy:', err);
+        console.error("Failed to copy:", err);
       }
     }
   };
@@ -108,13 +112,17 @@ export default function PopupWindow() {
     <div className="popup-window">
       <div className="popup-header">
         <h2>Ask Anywhere</h2>
-        <button className="close-button" onClick={handleClose}>✕</button>
+        <button className="close-button" onClick={handleClose}>
+          ✕
+        </button>
       </div>
 
       <div className="popup-content">
         <div className="section">
           <label>Selected Text:</label>
-          <div className="selected-text">{selectedText || 'No text selected'}</div>
+          <div className="selected-text">
+            {selectedText || "No text selected"}
+          </div>
         </div>
 
         <div className="section">
@@ -123,10 +131,10 @@ export default function PopupWindow() {
             {config.templates.map((template) => (
               <button
                 key={template.id}
-                className={`template-button ${selectedTemplate === template.id ? 'active' : ''}`}
+                className={`template-button ${selectedTemplate === template.id ? "active" : ""}`}
                 onClick={() => {
                   setSelectedTemplate(template.id);
-                  setCustomPrompt('');
+                  setCustomPrompt("");
                 }}
                 disabled={isStreaming}
               >
@@ -143,7 +151,7 @@ export default function PopupWindow() {
             value={customPrompt}
             onChange={(e) => {
               setCustomPrompt(e.target.value);
-              setSelectedTemplate('');
+              setSelectedTemplate("");
             }}
             placeholder="Enter your custom prompt..."
             disabled={isStreaming}
@@ -157,7 +165,10 @@ export default function PopupWindow() {
             className="model-select"
             value={config.selected_model_index}
             onChange={(e) => {
-              const newConfig = { ...config, selected_model_index: Number(e.target.value) };
+              const newConfig = {
+                ...config,
+                selected_model_index: Number(e.target.value),
+              };
               setConfig(newConfig);
             }}
             disabled={isStreaming}
@@ -175,12 +186,10 @@ export default function PopupWindow() {
           onClick={handleSend}
           disabled={isStreaming || !selectedText}
         >
-          {isStreaming ? 'Streaming...' : 'Send'}
+          {isStreaming ? "Streaming..." : "Send"}
         </button>
 
-        {error && (
-          <div className="error-message">{error}</div>
-        )}
+        {error && <div className="error-message">{error}</div>}
 
         {response && (
           <div className="section response-section">

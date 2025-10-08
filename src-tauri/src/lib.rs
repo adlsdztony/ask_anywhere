@@ -17,6 +17,9 @@ struct AppState {
     ai_client: AiClient,
 }
 
+// Captured text state
+struct CapturedText(Arc<Mutex<String>>);
+
 // Tauri commands
 
 #[tauri::command]
@@ -99,6 +102,12 @@ async fn stream_ai_response(
 }
 
 #[tauri::command]
+async fn get_captured_text(state: State<'_, CapturedText>) -> Result<String, String> {
+    let text = state.0.lock().await;
+    Ok(text.clone())
+}
+
+#[tauri::command]
 async fn show_popup_window(app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("popup") {
         window.show().map_err(|e| e.to_string())?;
@@ -143,6 +152,9 @@ pub fn run() {
                 ai_client: AiClient::new(),
             }));
             app.manage(state);
+
+            // Initialize captured text state
+            app.manage(CapturedText(Arc::new(Mutex::new(String::new()))));
 
             // Setup system tray
             let show = MenuItem::with_id(app, "show", "Show Settings", true, None::<&str>)?;
@@ -219,6 +231,19 @@ pub fn run() {
                         if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                             let app = app_handle.clone();
                             tauri::async_runtime::spawn(async move {
+                                // Capture the selected text using UI Automation API
+                                match clipboard::capture_selected_text().await {
+                                    Ok(text) => {
+                                        // Store the captured text in state
+                                        let captured_state: tauri::State<CapturedText> = app.state();
+                                        *captured_state.0.lock().await = text;
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Warning: Failed to capture selection: {}", e);
+                                    }
+                                }
+
+                                // Show the popup window
                                 let _ = show_popup_window(app).await;
                             });
                         }
@@ -248,6 +273,7 @@ pub fn run() {
             load_config,
             save_config,
             stream_ai_response,
+            get_captured_text,
             show_popup_window,
             hide_popup_window,
         ])

@@ -85,14 +85,17 @@ In the **Hotkeys** tab, configure your global shortcut:
 
 ### Using the Popup
 
-1. Select any text in any application
+1. Select any text in any application (highlight the text you want to query)
 2. Press your configured hotkey (default: `Ctrl+Shift+Space`)
-3. The popup window appears with your selected text
-4. Choose a template or enter a custom prompt
-5. Select a model (if you have multiple configured)
-6. Click **Send**
-7. Watch the AI response stream in real-time
-8. Copy the response to clipboard if needed
+3. The application automatically captures your selection (simulates Ctrl+C)
+4. The popup window appears with your selected text
+5. Choose a template or enter a custom prompt
+6. Select a model (if you have multiple configured)
+7. Click **Send**
+8. Watch the AI response stream in real-time
+9. Copy the response to clipboard if needed
+
+**Note**: The app captures the currently selected text, not just clipboard content. It works by automatically simulating Ctrl+C when the hotkey is pressed.
 
 ### System Tray
 
