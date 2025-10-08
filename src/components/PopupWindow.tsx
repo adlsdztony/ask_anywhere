@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 import { loadConfig, getCapturedText } from "../api";
 import { streamAiResponse } from "../services/aiClient";
 import type { AppConfig } from "../types";
@@ -34,7 +35,7 @@ export default function PopupWindow() {
     }
   };
 
-  const handleSend = async () => {
+  const handleSend = async (promptOverride?: string) => {
     if (!config) return;
 
     const selectedModel = config.models[config.selected_model_index];
@@ -45,7 +46,10 @@ export default function PopupWindow() {
 
     // Determine the prompt to use
     let finalPrompt = "";
-    if (selectedTemplate) {
+    if (promptOverride !== undefined) {
+      // Use the provided prompt override (from template click)
+      finalPrompt = `${promptOverride}\n\n${selectedText}`;
+    } else if (selectedTemplate) {
       const template = config.templates.find((t) => t.id === selectedTemplate);
       if (template) {
         finalPrompt = `${template.prompt}\n\n${selectedText}`;
@@ -87,6 +91,28 @@ export default function PopupWindow() {
     }
   };
 
+  const handleTemplateClick = (templateId: string) => {
+    if (isStreaming) return;
+
+    const template = config?.templates.find((t) => t.id === templateId);
+    if (template) {
+      setSelectedTemplate(templateId);
+      setCustomPrompt("");
+      handleSend(template.prompt);
+    }
+  };
+
+  const handleCustomPromptKeyDown = (
+    e: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (customPrompt.trim() && !isStreaming) {
+        handleSend();
+      }
+    }
+  };
+
   const handleCopyResponse = async () => {
     if (response) {
       try {
@@ -106,16 +132,12 @@ export default function PopupWindow() {
     <div className="popup-window">
       <div className="popup-content">
         <div className="section">
-          <label>Choose Action:</label>
           <div className="template-buttons">
             {config.templates.map((template) => (
               <button
                 key={template.id}
                 className={`template-button ${selectedTemplate === template.id ? "active" : ""}`}
-                onClick={() => {
-                  setSelectedTemplate(template.id);
-                  setCustomPrompt("");
-                }}
+                onClick={() => handleTemplateClick(template.id)}
                 disabled={isStreaming}
               >
                 {template.name}
@@ -125,7 +147,6 @@ export default function PopupWindow() {
         </div>
 
         <div className="section">
-          <label>Or Custom Prompt:</label>
           <textarea
             className="custom-prompt"
             value={customPrompt}
@@ -133,14 +154,14 @@ export default function PopupWindow() {
               setCustomPrompt(e.target.value);
               setSelectedTemplate("");
             }}
-            placeholder="Enter your custom prompt..."
+            onKeyDown={handleCustomPromptKeyDown}
+            placeholder="Enter your custom prompt (press Enter to send)..."
             disabled={isStreaming}
             rows={3}
           />
         </div>
 
         <div className="section">
-          <label>Model:</label>
           <select
             className="model-select"
             value={config.selected_model_index}
@@ -161,14 +182,6 @@ export default function PopupWindow() {
           </select>
         </div>
 
-        <button
-          className="send-button"
-          onClick={handleSend}
-          disabled={isStreaming || !selectedText}
-        >
-          {isStreaming ? "Streaming..." : "Send"}
-        </button>
-
         {error && <div className="error-message">{error}</div>}
 
         {response && (
@@ -179,7 +192,9 @@ export default function PopupWindow() {
                 Copy
               </button>
             </div>
-            <div className="response-text">{response}</div>
+            <div className="response-text markdown-content">
+              <ReactMarkdown>{response}</ReactMarkdown>
+            </div>
           </div>
         )}
       </div>
