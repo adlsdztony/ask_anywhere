@@ -56,40 +56,163 @@ async fn get_captured_text(state: State<'_, CapturedText>) -> Result<String, Str
     Ok(text.clone())
 }
 
+fn get_cursor_position() -> Result<(i32, i32), String> {
+    use mouse_position::mouse_position::Mouse;
+
+    match Mouse::get_mouse_position() {
+        Mouse::Position { x, y } => Ok((x, y)),
+        Mouse::Error => Err("Failed to get mouse position".to_string()),
+    }
+}
+
 #[tauri::command]
 async fn show_popup_window(app: AppHandle) -> Result<(), String> {
+    // Get cursor position in physical pixels
+    let (cursor_x, cursor_y) = get_cursor_position()?;
+
+    // Popup window size
+    const POPUP_WIDTH: f64 = 500.0;
+    const POPUP_HEIGHT: f64 = 600.0;
+    const OFFSET: i32 = 20;
+
     if let Some(window) = app.get_webview_window("popup") {
+        // Get the current monitor to determine scale factor and bounds
+        let monitor = window
+            .current_monitor()
+            .map_err(|e| e.to_string())?
+            .ok_or("Failed to get current monitor")?;
+
+        let scale_factor = monitor.scale_factor();
+        let monitor_size = monitor.size();
+        let monitor_position = monitor.position();
+
+        // Calculate popup position with boundary detection
+        let mut popup_x = cursor_x + OFFSET;
+        let mut popup_y = cursor_y + OFFSET;
+
+        // Check if popup would exceed right boundary
+        if popup_x + (POPUP_WIDTH * scale_factor) as i32
+            > monitor_position.x + monitor_size.width as i32
+        {
+            // Move to left of cursor
+            popup_x = cursor_x - OFFSET - (POPUP_WIDTH * scale_factor) as i32;
+        }
+
+        // Check if popup would exceed bottom boundary
+        if popup_y + (POPUP_HEIGHT * scale_factor) as i32
+            > monitor_position.y + monitor_size.height as i32
+        {
+            // Move above cursor
+            popup_y = cursor_y - OFFSET - (POPUP_HEIGHT * scale_factor) as i32;
+        }
+
+        // Ensure popup doesn't go off-screen to the left or top
+        if popup_x < monitor_position.x {
+            popup_x = monitor_position.x;
+        }
+        if popup_y < monitor_position.y {
+            popup_y = monitor_position.y;
+        }
+
+        // Convert physical pixels to logical pixels
+        let logical_x = (popup_x as f64) / scale_factor;
+        let logical_y = (popup_y as f64) / scale_factor;
+
+        // Position the existing window near the cursor using logical position
+        window
+            .set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                x: logical_x,
+                y: logical_y,
+            }))
+            .map_err(|e| e.to_string())?;
+
         window.show().map_err(|e| e.to_string())?;
         window.set_focus().map_err(|e| e.to_string())?;
     } else {
-        // Create popup window if it doesn't exist
+        // Create popup window first to get monitor info
         let popup = tauri::WebviewWindowBuilder::new(
             &app,
             "popup",
             tauri::WebviewUrl::App("popup.html".into()),
         )
         .title("Ask Anywhere")
-        .inner_size(500.0, 600.0)
+        .inner_size(POPUP_WIDTH, POPUP_HEIGHT)
         .resizable(true)
         .decorations(false)
         .always_on_top(true)
         .skip_taskbar(true)
         .transparent(true)
         .theme(None) // Follow system theme
+        .visible(false) // Create hidden first
         .build()
         .map_err(|e| e.to_string())?;
+
+        // Get the monitor containing the cursor
+        let monitor = popup
+            .current_monitor()
+            .map_err(|e| e.to_string())?
+            .ok_or("Failed to get current monitor")?;
+
+        let scale_factor = monitor.scale_factor();
+        let monitor_size = monitor.size();
+        let monitor_position = monitor.position();
+
+        // Calculate popup position with boundary detection
+        let mut popup_x = cursor_x + OFFSET;
+        let mut popup_y = cursor_y + OFFSET;
+
+        // Check if popup would exceed right boundary
+        if popup_x + (POPUP_WIDTH * scale_factor) as i32
+            > monitor_position.x + monitor_size.width as i32
+        {
+            // Move to left of cursor
+            popup_x = cursor_x - OFFSET - (POPUP_WIDTH * scale_factor) as i32;
+        }
+
+        // Check if popup would exceed bottom boundary
+        if popup_y + (POPUP_HEIGHT * scale_factor) as i32
+            > monitor_position.y + monitor_size.height as i32
+        {
+            // Move above cursor
+            popup_y = cursor_y - OFFSET - (POPUP_HEIGHT * scale_factor) as i32;
+        }
+
+        // Ensure popup doesn't go off-screen to the left or top
+        if popup_x < monitor_position.x {
+            popup_x = monitor_position.x;
+        }
+        if popup_y < monitor_position.y {
+            popup_y = monitor_position.y;
+        }
+
+        // Convert physical pixels to logical pixels
+        let logical_x = (popup_x as f64) / scale_factor;
+        let logical_y = (popup_y as f64) / scale_factor;
+
+        // Set position using logical coordinates
+        popup
+            .set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                x: logical_x,
+                y: logical_y,
+            }))
+            .map_err(|e| e.to_string())?;
 
         popup.show().map_err(|e| e.to_string())?;
         popup.set_focus().map_err(|e| e.to_string())?;
 
-        // Close popup window when it loses focus
+        // Delay setting up the focus loss handler to avoid immediate close
         let popup_clone = popup.clone();
-        popup.on_window_event(move |event| {
-            if let WindowEvent::Focused(focused) = event {
-                if !focused {
-                    let _ = popup_clone.close();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+            let popup_for_event = popup_clone.clone();
+            popup_clone.on_window_event(move |event| {
+                if let WindowEvent::Focused(focused) = event {
+                    if !focused {
+                        let _ = popup_for_event.close();
+                    }
                 }
-            }
+            });
         });
     }
 
