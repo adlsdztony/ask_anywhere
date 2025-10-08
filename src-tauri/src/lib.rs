@@ -71,7 +71,7 @@ async fn show_popup_window(app: AppHandle) -> Result<(), String> {
         .title("Ask Anywhere")
         .inner_size(500.0, 600.0)
         .resizable(true)
-        .decorations(true)
+        .decorations(false)
         .always_on_top(true)
         .skip_taskbar(true)
         .build()
@@ -79,6 +79,16 @@ async fn show_popup_window(app: AppHandle) -> Result<(), String> {
 
         popup.show().map_err(|e| e.to_string())?;
         popup.set_focus().map_err(|e| e.to_string())?;
+
+        // Close popup window when it loses focus
+        let popup_clone = popup.clone();
+        popup.on_window_event(move |event| {
+            if let WindowEvent::Focused(focused) = event {
+                if !focused {
+                    let _ = popup_clone.close();
+                }
+            }
+        });
     }
 
     Ok(())
