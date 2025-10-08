@@ -1,0 +1,74 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppConfig {
+    pub models: Vec<ModelConfig>,
+    pub templates: Vec<QuestionTemplate>,
+    pub hotkeys: HotkeyConfig,
+    pub selected_model_index: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelConfig {
+    pub name: String,
+    pub base_url: String,
+    pub api_key: String,
+    pub model_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuestionTemplate {
+    pub id: String,
+    pub name: String,
+    pub prompt: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HotkeyConfig {
+    pub popup_hotkey: String,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            models: vec![ModelConfig {
+                name: "Default OpenAI".to_string(),
+                base_url: "https://api.openai.com/v1".to_string(),
+                api_key: String::new(),
+                model_name: "gpt-4.1".to_string(),
+            }],
+            templates: vec![
+                QuestionTemplate {
+                    id: "translate".to_string(),
+                    name: "Translate to English".to_string(),
+                    prompt: "Translate the following text to English:".to_string(),
+                },
+                QuestionTemplate {
+                    id: "explain".to_string(),
+                    name: "Explain".to_string(),
+                    prompt: "Explain the following:".to_string(),
+                },
+                QuestionTemplate {
+                    id: "summarize".to_string(),
+                    name: "Summarize".to_string(),
+                    prompt: "Summarize the following text:".to_string(),
+                },
+            ],
+            hotkeys: HotkeyConfig {
+                popup_hotkey: "CommandOrControl+Alt+P".to_string(),
+            },
+            selected_model_index: 0,
+        }
+    }
+}
+
+impl Default for ModelConfig {
+    fn default() -> Self {
+        Self {
+            name: "New Model".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: String::new(),
+            model_name: "gpt-3.5-turbo".to_string(),
+        }
+    }
+}
