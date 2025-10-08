@@ -106,13 +106,6 @@ export default function PopupWindow() {
     <div className="popup-window">
       <div className="popup-content">
         <div className="section">
-          <label>Selected Text:</label>
-          <div className="selected-text">
-            {selectedText || "No text selected"}
-          </div>
-        </div>
-
-        <div className="section">
           <label>Choose Action:</label>
           <div className="template-buttons">
             {config.templates.map((template) => (

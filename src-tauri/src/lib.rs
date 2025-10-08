@@ -74,6 +74,8 @@ async fn show_popup_window(app: AppHandle) -> Result<(), String> {
         .decorations(false)
         .always_on_top(true)
         .skip_taskbar(true)
+        .transparent(true)
+        .theme(None) // Follow system theme
         .build()
         .map_err(|e| e.to_string())?;
 
