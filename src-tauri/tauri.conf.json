@@ -20,14 +20,12 @@
         "minHeight": 500,
         "visible": true,
         "center": true,
-        "resizable": true,
-        "decorations": true
+        "resizable": true
       }
     ],
     "security": {
       "csp": null
-    },
-    "withGlobalTauri": true
+    }
   },
   "bundle": {
     "active": true,
