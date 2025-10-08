@@ -3831,7 +3831,8 @@ dependencies = [
 [[package]]
 name = "selection"
 version = "1.2.0"
-source = "git+https://github.com/pot-app/selection#622e8f32c851daabe45c88481a1c59d11bc7256e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c56bdfb3cbb220dd9ae541e7a50318f6073cc7920949684c9788c54ba78edd64"
 dependencies = [
  "accessibility-ng",
  "accessibility-sys-ng",
