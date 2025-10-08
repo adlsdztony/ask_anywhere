@@ -6,7 +6,9 @@ use ai_client::AiClient;
 use config::AppConfig;
 use futures::StreamExt;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager, State, Window};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Emitter, Manager, State, Window, WindowEvent};
 use tauri_plugin_store::StoreExt;
 use tokio::sync::Mutex;
 
@@ -141,6 +143,48 @@ pub fn run() {
                 ai_client: AiClient::new(),
             }));
             app.manage(state);
+
+            // Setup system tray
+            let show = MenuItem::with_id(app, "show", "Show Settings", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show, &quit])?;
+
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click { .. } = event {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
+            // Handle window close event - minimize to tray instead of closing
+            if let Some(window) = app.get_webview_window("main") {
+                let window_clone = window.clone();
+                window.on_window_event(move |event| {
+                    if let WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = window_clone.hide();
+                    }
+                });
+            }
 
             // Register global shortcut
             let app_handle = app.handle().clone();

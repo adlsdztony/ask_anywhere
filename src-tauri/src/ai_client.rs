@@ -83,8 +83,8 @@ impl AiClient {
 
         let stream = response.bytes_stream();
         let mapped_stream = futures::stream::unfold(
-            (stream, Vec::new()),
-            |(mut stream, mut buffer)| async move {
+            (stream, Vec::new(), false),
+            |(mut stream, mut buffer, mut done)| async move {
                 use futures::StreamExt;
 
                 loop {
@@ -93,16 +93,14 @@ impl AiClient {
                             buffer.extend_from_slice(&chunk);
 
                             // Process complete lines
+                            let mut lines_to_process = Vec::new();
                             let mut last_newline = 0;
+
                             for (i, &byte) in buffer.iter().enumerate() {
                                 if byte == b'\n' {
                                     let line = &buffer[last_newline..i];
+                                    lines_to_process.push(line.to_vec());
                                     last_newline = i + 1;
-
-                                    if let Some(content) = parse_sse_line(line) {
-                                        buffer.drain(..last_newline);
-                                        return Some((Ok(content), (stream, buffer)));
-                                    }
                                 }
                             }
 
@@ -110,11 +108,32 @@ impl AiClient {
                             if last_newline > 0 {
                                 buffer.drain(..last_newline);
                             }
+
+                            // Process all complete lines
+                            for line in lines_to_process {
+                                match parse_sse_line(&line) {
+                                    ParseResult::Content(content) => {
+                                        return Some((Ok(content), (stream, buffer, done)));
+                                    }
+                                    ParseResult::Done => {
+                                        done = true;
+                                    }
+                                    ParseResult::Skip => {
+                                        // Continue processing next line
+                                        continue;
+                                    }
+                                }
+                            }
+
+                            // If we've seen [DONE] and no more data, end stream
+                            if done {
+                                return None;
+                            }
                         }
                         Some(Err(e)) => {
                             return Some((
                                 Err(anyhow::anyhow!("Stream error: {}", e)),
-                                (stream, buffer),
+                                (stream, buffer, done),
                             ));
                         }
                         None => return None,
@@ -127,26 +146,40 @@ impl AiClient {
     }
 }
 
-fn parse_sse_line(line: &[u8]) -> Option<String> {
-    let line_str = std::str::from_utf8(line).ok()?;
+enum ParseResult {
+    Content(String),
+    Done,
+    Skip,
+}
+
+fn parse_sse_line(line: &[u8]) -> ParseResult {
+    let line_str = match std::str::from_utf8(line) {
+        Ok(s) => s,
+        Err(_) => return ParseResult::Skip,
+    };
 
     if line_str.starts_with("data: ") {
-        let json_str = line_str.strip_prefix("data: ")?.trim();
+        let json_str = match line_str.strip_prefix("data: ") {
+            Some(s) => s.trim(),
+            None => return ParseResult::Skip,
+        };
 
         // Check for [DONE] marker
         if json_str == "[DONE]" {
-            return None;
+            return ParseResult::Done;
         }
 
         // Parse JSON
         if let Ok(response) = serde_json::from_str::<StreamResponse>(json_str) {
             if let Some(choice) = response.choices.first() {
                 if let Some(content) = &choice.delta.content {
-                    return Some(content.clone());
+                    if !content.is_empty() {
+                        return ParseResult::Content(content.clone());
+                    }
                 }
             }
         }
     }
 
-    None
+    ParseResult::Skip
 }

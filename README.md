@@ -7,9 +7,10 @@ A high-performance Windows global text-selection AI query tool built with Tauri 
 - 🚀 **Global Hotkey Support**: Quickly summon the AI assistant from anywhere in Windows
 - 📋 **Smart Clipboard Integration**: Automatically captures selected text when invoked
 - 🤖 **OpenAI-Compatible API Support**: Works with OpenAI, OpenRouter, local LLMs, and any OpenAI-compatible endpoints
-- 💬 **Real-time Streaming Responses**: Get AI responses as they're generated
+- 💬 **Real-time Streaming Responses**: Get AI responses as they're generated (with full streaming support)
 - 📝 **Customizable Question Templates**: Pre-define common prompts for quick access
 - 🔧 **Multi-Model Support**: Configure and switch between multiple AI models
+- 🎯 **System Tray Integration**: Minimize to system tray and run in background
 - ⚡ **High Performance**: Built with Rust for low latency and minimal resource usage
 
 ## Architecture
@@ -92,6 +93,16 @@ In the **Hotkeys** tab, configure your global shortcut:
 6. Click **Send**
 7. Watch the AI response stream in real-time
 8. Copy the response to clipboard if needed
+
+### System Tray
+
+The application minimizes to the system tray when you close the main window:
+- **Click the tray icon**: Restore the settings window
+- **Right-click the tray icon**: Access menu options
+  - **Show Settings**: Open the configuration window
+  - **Quit**: Exit the application completely
+
+The application continues running in the background, ready to respond to your global hotkey even when the main window is hidden.
 
 ## Configuration File
 
