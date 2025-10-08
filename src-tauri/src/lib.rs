@@ -1,21 +1,13 @@
-mod ai_client;
 mod clipboard;
 mod config;
 
-use ai_client::AiClient;
 use config::AppConfig;
-use futures::StreamExt;
 use std::sync::Arc;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Emitter, Manager, State, Window, WindowEvent};
+use tauri::{AppHandle, Manager, State, WindowEvent};
 use tauri_plugin_store::StoreExt;
 use tokio::sync::Mutex;
-
-// Global state
-struct AppState {
-    ai_client: AiClient,
-}
 
 // Captured text state
 struct CapturedText(Arc<Mutex<String>>);
@@ -54,49 +46,6 @@ async fn save_config(app: AppHandle, config: AppConfig) -> Result<(), String> {
     );
 
     store.save().map_err(|e| e.to_string())?;
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn stream_ai_response(
-    state: State<'_, Arc<Mutex<AppState>>>,
-    window: Window,
-    base_url: String,
-    api_key: String,
-    model_name: String,
-    prompt: String,
-) -> Result<(), String> {
-    let state = state.lock().await;
-
-    let mut stream = state
-        .ai_client
-        .stream_chat(&base_url, &api_key, &model_name, &prompt)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // Drop the lock before streaming
-    drop(state);
-
-    while let Some(result) = stream.next().await {
-        match result {
-            Ok(content) => {
-                window
-                    .emit("ai-stream-chunk", content)
-                    .map_err(|e| e.to_string())?;
-            }
-            Err(e) => {
-                window
-                    .emit("ai-stream-error", e.to_string())
-                    .map_err(|e| e.to_string())?;
-                return Err(e.to_string());
-            }
-        }
-    }
-
-    window
-        .emit("ai-stream-done", ())
-        .map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -147,12 +96,6 @@ async fn hide_popup_window(app: AppHandle) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            // Initialize app state
-            let state = Arc::new(Mutex::new(AppState {
-                ai_client: AiClient::new(),
-            }));
-            app.manage(state);
-
             // Initialize captured text state
             app.manage(CapturedText(Arc::new(Mutex::new(String::new()))));
 
@@ -272,7 +215,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load_config,
             save_config,
-            stream_ai_response,
             get_captured_text,
             show_popup_window,
             hide_popup_window,

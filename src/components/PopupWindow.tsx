@@ -1,10 +1,6 @@
-import React, { useState, useEffect } from "react";
-import {
-  loadConfig,
-  streamAiResponse,
-  hidePopupWindow,
-  getCapturedText,
-} from "../api";
+import { useState, useEffect } from "react";
+import { loadConfig, getCapturedText } from "../api";
+import { streamAiResponse } from "../services/aiClient";
 import type { AppConfig } from "../types";
 import "./PopupWindow.css";
 
@@ -71,15 +67,17 @@ export default function PopupWindow() {
         selectedModel.api_key,
         selectedModel.model_name,
         finalPrompt,
-        (chunk) => {
-          setResponse((prev) => prev + chunk);
-        },
-        (err) => {
-          setError(err);
-          setIsStreaming(false);
-        },
-        () => {
-          setIsStreaming(false);
+        {
+          onChunk: (chunk) => {
+            setResponse((prev) => prev + chunk);
+          },
+          onError: (err) => {
+            setError(err);
+            setIsStreaming(false);
+          },
+          onDone: () => {
+            setIsStreaming(false);
+          },
         },
       );
     } catch (err) {
@@ -87,10 +85,6 @@ export default function PopupWindow() {
       setError(err instanceof Error ? err.message : "Failed to get response");
       setIsStreaming(false);
     }
-  };
-
-  const handleClose = async () => {
-    await hidePopupWindow();
   };
 
   const handleCopyResponse = async () => {
@@ -110,13 +104,6 @@ export default function PopupWindow() {
 
   return (
     <div className="popup-window">
-      <div className="popup-header">
-        <h2>Ask Anywhere</h2>
-        <button className="close-button" onClick={handleClose}>
-          ✕
-        </button>
-      </div>
-
       <div className="popup-content">
         <div className="section">
           <label>Selected Text:</label>

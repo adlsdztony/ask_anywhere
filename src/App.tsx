@@ -1,4 +1,3 @@
-import React from "react";
 import ConfigPage from "./components/ConfigPage";
 import "./App.css";
 

@@ -13,19 +13,6 @@
   color: #666;
 }
 
-.popup-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: #007bff;
-  color: white;
-  border-bottom: 1px solid #0056b3;
-}
-
-.popup-header h2 {
-  margin: 0;
-  font-size: 18px;
   font-weight: 600;
 }
 
