@@ -26,50 +26,67 @@ body::-webkit-scrollbar {
 /* Pin button */
 .pin-button {
     flex-shrink: 0;
-    width: 32px;
-    height: 32px;
-    margin-right: 4px;
-    background: rgba(100, 150, 255, 0);
-    border: 1.5px solid rgba(100, 150, 255, 0);
+    width: 30px;
+    height: 30px;
+    margin-right: 6px;
+    background: transparent;
+    border: none;
     border-radius: 50%;
-    font-size: 14px;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
     outline: none;
+    color: rgba(100, 100, 100, 0.6);
 }
 
 .pin-button:hover {
-    background: rgba(100, 150, 255, 0.2);
-    border-color: rgba(100, 150, 255, 0.35);
-    transform: scale(1.05);
+    background: rgba(0, 0, 0, 0.05);
+    color: rgba(100, 100, 100, 0.9);
 }
 
 .pin-button:active {
     transform: scale(0.95);
+    background: rgba(0, 0, 0, 0.08);
 }
 
 .pin-button.pinned {
-    background: rgba(100, 150, 255, 0.25);
-    border-color: rgba(100, 150, 255, 0.45);
+    background: rgba(100, 150, 255, 0.12);
+    color: rgba(100, 150, 255, 0.9);
+}
+
+.pin-button.pinned:hover {
+    background: rgba(100, 150, 255, 0.18);
+    color: rgba(100, 150, 255, 1);
+}
+
+.pin-button svg {
+    transition: all 0.2s ease;
 }
 
 @media (prefers-color-scheme: dark) {
     .pin-button {
-        background: rgba(100, 150, 255, 0);
-        border-color: rgba(100, 150, 255, 0);
+        color: rgba(200, 200, 200, 0.5);
     }
 
     .pin-button:hover {
-        background: rgba(100, 150, 255, 0.25);
-        border-color: rgba(100, 150, 255, 0.45);
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(200, 200, 200, 0.9);
+    }
+
+    .pin-button:active {
+        background: rgba(255, 255, 255, 0.12);
     }
 
     .pin-button.pinned {
-        background: rgba(100, 150, 255, 0.35);
-        border-color: rgba(100, 150, 255, 0.55);
+        background: rgba(100, 150, 255, 0.2);
+        color: rgba(120, 170, 255, 0.95);
+    }
+
+    .pin-button.pinned:hover {
+        background: rgba(100, 150, 255, 0.28);
+        color: rgba(120, 170, 255, 1);
     }
 }
 
@@ -167,7 +184,6 @@ body::-webkit-scrollbar {
 }
 
 .slash-button:hover:not(:disabled) {
-    background: rgba(100, 150, 255, 0.25);
     border-color: rgba(100, 150, 255, 0.4);
     transform: scale(1.05);
 }
@@ -183,13 +199,10 @@ body::-webkit-scrollbar {
 
 @media (prefers-color-scheme: dark) {
     .slash-button {
-        background: rgba(100, 150, 255, 0);
-        border-color: rgba(100, 150, 255, 0.35);
         color: rgba(120, 170, 255, 0.95);
     }
 
     .slash-button:hover:not(:disabled) {
-        background: rgba(100, 150, 255, 0.3);
         border-color: rgba(100, 150, 255, 0.5);
     }
 }

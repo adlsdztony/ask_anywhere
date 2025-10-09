@@ -438,10 +438,31 @@ export default function PopupWindow() {
           <button
             className={`pin-button ${isPinned ? "pinned" : ""}`}
             onClick={handlePinClick}
-            title={isPinned ? "Click to unpin" : "Click to pin"}
+            title={isPinned ? "Unpin window" : "Pin window"}
             type="button"
           >
-            {isPinned ? "📌" : "📍"}
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {isPinned ? (
+                <>
+                  <line x1="12" y1="17" x2="12" y2="22" />
+                  <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+                </>
+              ) : (
+                <>
+                  <line x1="12" y1="17" x2="12" y2="22" />
+                  <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+                </>
+              )}
+            </svg>
           </button>
         </div>
 
