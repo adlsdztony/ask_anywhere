@@ -23,54 +23,6 @@ body::-webkit-scrollbar {
     overflow: hidden;
 }
 
-/* Drag handle */
-.drag-handle {
-    flex-shrink: 0;
-    width: 28px;
-    height: 32px;
-    margin-right: 2px;
-    background: rgba(100, 150, 255, 0);
-    border: 1.5px solid rgba(100, 150, 255, 0);
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: bold;
-    color: rgba(100, 100, 100, 0.4);
-    cursor: grab;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    outline: none;
-    letter-spacing: -2px;
-}
-
-.drag-handle:hover {
-    background: rgba(100, 150, 255, 0.15);
-    border-color: rgba(100, 150, 255, 0.25);
-    color: rgba(100, 150, 255, 0.7);
-}
-
-.drag-handle:active {
-    cursor: grabbing;
-    background: rgba(100, 150, 255, 0.2);
-}
-
-@media (prefers-color-scheme: dark) {
-    .drag-handle {
-        color: rgba(200, 200, 200, 0.4);
-    }
-
-    .drag-handle:hover {
-        background: rgba(100, 150, 255, 0.2);
-        border-color: rgba(100, 150, 255, 0.35);
-        color: rgba(120, 170, 255, 0.8);
-    }
-
-    .drag-handle:active {
-        background: rgba(100, 150, 255, 0.25);
-    }
-}
-
 /* Pin button */
 .pin-button {
     flex-shrink: 0;
@@ -172,10 +124,15 @@ body::-webkit-scrollbar {
     gap: 4px;
     transition: all 0.3s ease;
     z-index: 3000;
+    cursor: default;
 }
 
 .input-container:focus-within {
     border-color: rgba(100, 150, 255, 0.4);
+}
+
+.input-container:hover {
+    border-color: rgba(100, 150, 255, 0.15);
 }
 
 @media (prefers-color-scheme: dark) {

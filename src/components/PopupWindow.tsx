@@ -335,7 +335,21 @@ export default function PopupWindow() {
     }
   };
 
-  const handlePinDragStart = async (e: React.MouseEvent) => {
+  const handleContainerMouseDown = async (e: React.MouseEvent) => {
+    // Only handle dragging if clicking on the container itself, not its children
+    const target = e.target as HTMLElement;
+
+    // Check if clicked on interactive elements
+    if (
+      target.tagName === "INPUT" ||
+      target.tagName === "BUTTON" ||
+      target.closest("button") ||
+      target.closest("input") ||
+      target.closest(".custom-dropdown")
+    ) {
+      return;
+    }
+
     e.preventDefault();
     e.stopPropagation();
 
@@ -370,7 +384,7 @@ export default function PopupWindow() {
       <div
         className={`popup-content ${showSuggestions ? "with-suggestions" : ""}`}
       >
-        <div className="input-container">
+        <div className="input-container" onMouseDown={handleContainerMouseDown}>
           <button
             className="slash-button"
             onClick={handleSlashButtonClick}
@@ -421,14 +435,6 @@ export default function PopupWindow() {
               </div>
             )}
           </div>
-          <button
-            className="drag-handle"
-            onMouseDown={handlePinDragStart}
-            title="Drag to move window"
-            type="button"
-          >
-            ⋮⋮
-          </button>
           <button
             className={`pin-button ${isPinned ? "pinned" : ""}`}
             onClick={handlePinClick}
