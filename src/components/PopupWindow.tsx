@@ -16,6 +16,47 @@ import { streamAiResponse } from "../services/aiClient";
 import type { AppConfig } from "../types";
 import "./PopupWindow.css";
 
+// CodeBlock component with copy button
+function CodeBlock({ children }: { children: React.ReactNode }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    // Extract text content from the code element
+    const codeElement = Array.isArray(children) ? children[0] : children;
+    let textContent = "";
+
+    if (
+      codeElement &&
+      typeof codeElement === "object" &&
+      "props" in codeElement
+    ) {
+      const codeProps = codeElement.props;
+      if (codeProps && codeProps.children) {
+        textContent = String(codeProps.children);
+      }
+    }
+
+    if (textContent) {
+      try {
+        await navigator.clipboard.writeText(textContent);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        console.error("Failed to copy code:", err);
+      }
+    }
+  };
+
+  return (
+    <pre className="code-block-wrapper">
+      <button className="code-copy-button" onClick={handleCopy}>
+        {copied ? "Copied!" : "Copy"}
+      </button>
+      {children}
+    </pre>
+  );
+}
+
 export default function PopupWindow() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [selectedText, setSelectedText] = useState("");
@@ -538,7 +579,14 @@ export default function PopupWindow() {
                   {copyButtonText}
                 </button>
               </div>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  pre: ({ children }) => {
+                    return <CodeBlock>{children}</CodeBlock>;
+                  },
+                }}
+              >
                 {response}
               </ReactMarkdown>
             </div>

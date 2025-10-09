@@ -600,6 +600,55 @@ body::-webkit-scrollbar {
     }
 }
 
+/* Code block wrapper with copy button */
+.code-block-wrapper {
+    position: relative;
+    background: rgba(0, 0, 0, 0.06);
+    padding: 12px;
+    padding-top: 40px;
+    border-radius: 12px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+.code-copy-button {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1.5px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    font-size: 10px;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+.code-copy-button:hover {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(0, 0, 0, 0.2);
+    transform: translateY(-1px);
+}
+
+@media (prefers-color-scheme: dark) {
+    .code-block-wrapper {
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .code-copy-button {
+        background: rgba(60, 60, 60, 0.8);
+        border-color: rgba(255, 255, 255, 0.2);
+        color: #d0d0d0;
+    }
+
+    .code-copy-button:hover {
+        background: rgba(80, 80, 80, 0.9);
+    }
+}
+
 .markdown-content pre {
     background: rgba(0, 0, 0, 0.06);
     padding: 12px;
