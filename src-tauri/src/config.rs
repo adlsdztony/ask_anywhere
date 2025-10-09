@@ -57,19 +57,19 @@ impl Default for AppConfig {
             }],
             templates: vec![
                 QuestionTemplate {
-                    id: "translate".to_string(),
-                    name: "Translate to English".to_string(),
-                    prompt: "Translate the following text to English:".to_string(),
+                    id: "background_translate".to_string(),
+                    name: "Background Translation".to_string(),
+                    prompt: "If the selected text is mostly Chinese, translate it into English; if it is mostly English or other languages, translate it into Chinese. Please only provide the translated text.".to_string(),
                     action: "replace".to_string(),
-                    hotkey: None,
-                    background_mode: false,
+                    hotkey: Some("Alt+Shift+Q".to_string()),
+                    background_mode: true,
                 },
                 QuestionTemplate {
-                    id: "explain".to_string(),
-                    name: "Explain".to_string(),
-                    prompt: "Explain the following:".to_string(),
+                    id: "translate".to_string(),
+                    name: "Translate".to_string(),
+                    prompt: "If the selected text is mostly Chinese, translate it into English; if it is mostly English or other languages, translate it into Chinese. Please only provide the translated text.".to_string(),
                     action: "none".to_string(),
-                    hotkey: None,
+                    hotkey: Some("Alt+Q".to_string()),
                     background_mode: false,
                 },
                 QuestionTemplate {
