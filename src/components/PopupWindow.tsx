@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { loadConfig, getCapturedText } from "../api";
 import { streamAiResponse } from "../services/aiClient";
@@ -13,9 +13,25 @@ export default function PopupWindow() {
   const [response, setResponse] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     initializePopup();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const initializePopup = async () => {
@@ -102,17 +118,6 @@ export default function PopupWindow() {
     }
   };
 
-  const handleCustomPromptKeyDown = (
-    e: React.KeyboardEvent<HTMLTextAreaElement>,
-  ) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      if (customPrompt.trim() && !isStreaming) {
-        handleSend();
-      }
-    }
-  };
-
   const handleCopyResponse = async () => {
     if (response) {
       try {
@@ -131,61 +136,73 @@ export default function PopupWindow() {
   return (
     <div className="popup-window">
       <div className="popup-content">
-        <div className="section">
-          <div className="template-buttons">
-            {config.templates.map((template) => (
-              <button
-                key={template.id}
-                className={`template-button ${selectedTemplate === template.id ? "active" : ""}`}
-                onClick={() => handleTemplateClick(template.id)}
-                disabled={isStreaming}
-              >
-                {template.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="section">
-          <textarea
+        <div className="input-container">
+          <input
+            type="text"
             className="custom-prompt"
             value={customPrompt}
             onChange={(e) => {
               setCustomPrompt(e.target.value);
               setSelectedTemplate("");
             }}
-            onKeyDown={handleCustomPromptKeyDown}
-            placeholder="Enter your custom prompt (press Enter to send)..."
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !isStreaming && customPrompt.trim()) {
+                handleSend();
+              }
+            }}
+            placeholder="Ask anything..."
             disabled={isStreaming}
-            rows={3}
           />
+          <div className="custom-dropdown" ref={dropdownRef}>
+            <button
+              className="model-select"
+              onClick={() => !isStreaming && setIsDropdownOpen(!isDropdownOpen)}
+              disabled={isStreaming}
+              type="button"
+            >
+              {config.models[config.selected_model_index]?.name ||
+                "Select Model"}
+            </button>
+            {isDropdownOpen && (
+              <div className="dropdown-menu">
+                {config.models.map((model, index) => (
+                  <div
+                    key={index}
+                    className={`dropdown-item ${index === config.selected_model_index ? "active" : ""}`}
+                    onClick={() => {
+                      const newConfig = {
+                        ...config,
+                        selected_model_index: index,
+                      };
+                      setConfig(newConfig);
+                      setIsDropdownOpen(false);
+                    }}
+                  >
+                    {model.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="section">
-          <select
-            className="model-select"
-            value={config.selected_model_index}
-            onChange={(e) => {
-              const newConfig = {
-                ...config,
-                selected_model_index: Number(e.target.value),
-              };
-              setConfig(newConfig);
-            }}
-            disabled={isStreaming}
-          >
-            {config.models.map((model, index) => (
-              <option key={index} value={index}>
-                {model.name}
-              </option>
-            ))}
-          </select>
+        <div className="template-buttons">
+          {config.templates.map((template) => (
+            <button
+              key={template.id}
+              className={`template-button ${selectedTemplate === template.id ? "active" : ""}`}
+              onClick={() => handleTemplateClick(template.id)}
+              disabled={isStreaming}
+            >
+              {template.name}
+            </button>
+          ))}
         </div>
 
         {error && <div className="error-message">{error}</div>}
 
         {response && (
-          <div className="section response-section">
+          <div className="response-section">
             <div className="response-header">
               <label>Response:</label>
               <button className="copy-button" onClick={handleCopyResponse}>
