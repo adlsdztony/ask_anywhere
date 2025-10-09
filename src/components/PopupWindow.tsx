@@ -427,10 +427,13 @@ export default function PopupWindow() {
     const input = customPrompt.toLowerCase();
     if (!input.startsWith("/")) return [];
 
-    const searchTerm = input.slice(1);
-    if (searchTerm === "") return config.templates;
+    // Filter out templates with background_mode enabled
+    const visibleTemplates = config.templates.filter((t) => !t.background_mode);
 
-    return config.templates.filter((t) =>
+    const searchTerm = input.slice(1);
+    if (searchTerm === "") return visibleTemplates;
+
+    return visibleTemplates.filter((t) =>
       t.name.toLowerCase().startsWith(searchTerm),
     );
   };
