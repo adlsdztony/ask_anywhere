@@ -6,6 +6,8 @@ pub struct AppConfig {
     pub templates: Vec<QuestionTemplate>,
     pub hotkeys: HotkeyConfig,
     pub selected_model_index: usize,
+    #[serde(default)]
+    pub autostart: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +60,7 @@ impl Default for AppConfig {
                 popup_hotkey: "CommandOrControl+Alt+P".to_string(),
             },
             selected_model_index: 0,
+            autostart: false,
         }
     }
 }

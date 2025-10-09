@@ -1,9 +1,10 @@
 mod clipboard;
 mod config;
 
+use auto_launch::AutoLaunch;
 use config::AppConfig;
 use std::sync::Arc;
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{CheckMenuItem, Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, State, WindowEvent};
 use tauri_plugin_store::StoreExt;
@@ -54,6 +55,40 @@ async fn save_config(app: AppHandle, config: AppConfig) -> Result<(), String> {
 async fn get_captured_text(state: State<'_, CapturedText>) -> Result<String, String> {
     let text = state.0.lock().await;
     Ok(text.clone())
+}
+
+// Helper function to create AutoLaunch instance
+fn create_auto_launch() -> Result<AutoLaunch, String> {
+    let app_name = "AskAnywhere";
+    let app_path = std::env::current_exe().map_err(|e| e.to_string())?;
+
+    Ok(AutoLaunch::new(
+        app_name,
+        &app_path.to_string_lossy(),
+        &[] as &[&str],
+    ))
+}
+
+#[tauri::command]
+async fn toggle_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let auto_launch = create_auto_launch()?;
+
+    if enabled {
+        auto_launch
+            .enable()
+            .map_err(|e| format!("Failed to enable autostart: {:?}", e))?;
+    } else {
+        auto_launch
+            .disable()
+            .map_err(|e| format!("Failed to disable autostart: {:?}", e))?;
+    }
+
+    // Update config
+    let mut config = load_config(app.clone()).await?;
+    config.autostart = enabled;
+    save_config(app, config).await?;
+
+    Ok(())
 }
 
 fn get_cursor_position() -> Result<(i32, i32), String> {
@@ -306,15 +341,36 @@ pub fn run() {
             // Initialize captured text state
             app.manage(CapturedText(Arc::new(Mutex::new(String::new()))));
 
-            // Setup system tray
+            // Load config to get autostart state
+            let store = app.store("config.json")?;
+            let config: AppConfig = match store.get("app_config") {
+                Some(value) => serde_json::from_value(value.clone())?,
+                None => AppConfig::default(),
+            };
+
+            // Setup system tray with autostart checkbox
+            let autostart_item = CheckMenuItem::with_id(app, "autostart", "Autostart", true, config.autostart, None::<&str>)?;
             let restart = MenuItem::with_id(app, "restart", "Restart", true, None::<&str>)?;
             let exit = MenuItem::with_id(app, "exit", "Exit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&restart, &exit])?;
+            let menu = Menu::with_items(app, &[&autostart_item, &restart, &exit])?;
 
-            let _tray = TrayIconBuilder::new()
+            let _tray = TrayIconBuilder::with_id("tray")
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
-                .on_menu_event(|app, event| match event.id.as_ref() {
+                .on_menu_event(move |app, event| match event.id.as_ref() {
+                    "autostart" => {
+                        // Toggle autostart in a new task
+                        let app_clone = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            // Load current config to get current state
+                            if let Ok(config) = load_config(app_clone.clone()).await {
+                                let new_state = !config.autostart;
+                                if let Err(e) = toggle_autostart(app_clone, new_state).await {
+                                    eprintln!("Failed to toggle autostart: {}", e);
+                                }
+                            }
+                        });
+                    }
                     "restart" => {
                         app.restart();
                     }
@@ -428,6 +484,7 @@ pub fn run() {
             show_popup_window,
             hide_popup_window,
             resize_popup_window,
+            toggle_autostart,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
