@@ -65,7 +65,7 @@ body::-webkit-scrollbar {
     position: relative;
     display: flex;
     align-items: center;
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(40px);
     border: 1.5px solid rgba(0, 0, 0, 0.08);
     border-radius: 50px;
@@ -248,7 +248,7 @@ body::-webkit-scrollbar {
 
 .template-button {
     padding: 8px 16px;
-    background: rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(30px);
     border: 1.5px solid rgba(0, 0, 0, 0.1);
     border-radius: 50px;
@@ -260,14 +260,14 @@ body::-webkit-scrollbar {
 }
 
 .template-button:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 1);
     border-color: rgba(100, 150, 255, 0.3);
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
 }
 
 .template-button.active {
-    background: rgba(100, 150, 255, 0.35);
+    background: rgba(100, 150, 255, 0.95);
     border-color: rgba(100, 150, 255, 0.5);
     color: #333;
 }
@@ -321,7 +321,7 @@ body::-webkit-scrollbar {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(35px);
     border: 1.5px solid rgba(0, 0, 0, 0.08);
     border-radius: 24px;
@@ -332,7 +332,7 @@ body::-webkit-scrollbar {
 
 @media (prefers-color-scheme: dark) {
     .response-section {
-        background: rgba(40, 40, 40, 0.90);
+        background: rgba(40, 40, 40, 0.95);
         border-color: rgba(255, 255, 255, 0.15);
     }
 }

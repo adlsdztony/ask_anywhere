@@ -242,13 +242,6 @@ async fn resize_popup_window(app: AppHandle, width: f64, height: f64) -> Result<
         let monitor_size = monitor.size();
         let monitor_position = monitor.position();
 
-        // Get current size
-        let current_size = window.outer_size().map_err(|e| e.to_string())?;
-        let current_height = (current_size.height as f64) / scale_factor;
-
-        // Calculate the height difference
-        let height_diff = height - current_height;
-
         // Set new size
         window
             .set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }))
