@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   loadConfig,
   getCapturedText,
   resizePopupWindow,
   hidePopupWindow,
+  setPopupPinned,
+  isPopupPinned,
 } from "../api";
 import { streamAiResponse } from "../services/aiClient";
 import type { AppConfig } from "../types";
@@ -22,6 +25,7 @@ export default function PopupWindow() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [copyButtonText, setCopyButtonText] = useState("Copy");
+  const [isPinned, setIsPinned] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -108,6 +112,10 @@ export default function PopupWindow() {
       if (capturedText) {
         setSelectedText(capturedText);
       }
+
+      // Load pinned state
+      const pinned = await isPopupPinned();
+      setIsPinned(pinned);
 
       // Auto-focus input field after a short delay
       setTimeout(() => {
@@ -314,6 +322,45 @@ export default function PopupWindow() {
     }
   };
 
+  const handlePinClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    try {
+      const newPinnedState = !isPinned;
+      setIsPinned(newPinnedState);
+      await setPopupPinned(newPinnedState);
+    } catch (err) {
+      console.error("Failed to toggle pin:", err);
+    }
+  };
+
+  const handlePinDragStart = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Check if it's a left click (button 0)
+    if (e.button !== 0) return;
+
+    // Temporarily pin the window to prevent it from closing during drag
+    const wasPinned = isPinned;
+    if (!wasPinned) {
+      await setPopupPinned(true);
+    }
+
+    try {
+      const window = getCurrentWindow();
+      await window.startDragging();
+    } catch (err) {
+      console.error("Failed to start dragging:", err);
+    } finally {
+      // Restore original pin state after drag
+      if (!wasPinned) {
+        await setPopupPinned(false);
+      }
+    }
+  };
+
   if (!config) {
     return <div className="popup-window loading">Loading...</div>;
   }
@@ -374,6 +421,22 @@ export default function PopupWindow() {
               </div>
             )}
           </div>
+          <button
+            className="drag-handle"
+            onMouseDown={handlePinDragStart}
+            title="Drag to move window"
+            type="button"
+          >
+            ⋮⋮
+          </button>
+          <button
+            className={`pin-button ${isPinned ? "pinned" : ""}`}
+            onClick={handlePinClick}
+            title={isPinned ? "Click to unpin" : "Click to pin"}
+            type="button"
+          >
+            {isPinned ? "📌" : "📍"}
+          </button>
         </div>
 
         {showSuggestions && getFilteredTemplates().length > 0 && (

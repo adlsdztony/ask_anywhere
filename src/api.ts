@@ -27,3 +27,11 @@ export async function resizePopupWindow(
 ): Promise<void> {
   await invoke("resize_popup_window", { width, height });
 }
+
+export async function setPopupPinned(pinned: boolean): Promise<void> {
+  await invoke("set_popup_pinned", { pinned });
+}
+
+export async function isPopupPinned(): Promise<boolean> {
+  return await invoke<boolean>("is_popup_pinned");
+}

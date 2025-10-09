@@ -15,6 +15,9 @@ use tokio::sync::Mutex;
 // Captured text state
 struct CapturedText(Arc<Mutex<String>>);
 
+// Popup pinned state
+struct PopupPinned(Arc<Mutex<bool>>);
+
 // Tauri commands
 
 #[tauri::command]
@@ -346,14 +349,26 @@ async fn show_popup_window(app: AppHandle) -> Result<(), String> {
 
         // Delay setting up the focus loss handler to avoid immediate close
         let popup_clone = popup.clone();
+        let app_clone = app.clone();
         tauri::async_runtime::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
-            let popup_for_event = popup_clone.clone();
+            let app_for_event = app_clone.clone();
+            let popup_for_clone = popup_clone.clone();
             popup_clone.on_window_event(move |event| {
                 if let WindowEvent::Focused(focused) = event {
                     if !focused {
-                        let _ = popup_for_event.close();
+                        // Check if popup is pinned before closing
+                        let pinned_state: tauri::State<PopupPinned> = app_for_event.state();
+                        let popup_to_close = popup_for_clone.clone();
+                        let pinned_arc = pinned_state.0.clone();
+
+                        tauri::async_runtime::spawn(async move {
+                            let is_pinned = pinned_arc.lock().await;
+                            if !*is_pinned {
+                                let _ = popup_to_close.close();
+                            }
+                        });
                     }
                 }
             });
@@ -369,6 +384,19 @@ async fn hide_popup_window(app: AppHandle) -> Result<(), String> {
         window.hide().map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[tauri::command]
+async fn set_popup_pinned(state: State<'_, PopupPinned>, pinned: bool) -> Result<(), String> {
+    let mut is_pinned = state.0.lock().await;
+    *is_pinned = pinned;
+    Ok(())
+}
+
+#[tauri::command]
+async fn is_popup_pinned(state: State<'_, PopupPinned>) -> Result<bool, String> {
+    let is_pinned = state.0.lock().await;
+    Ok(*is_pinned)
 }
 
 #[tauri::command]
@@ -448,6 +476,8 @@ pub fn run() {
         .setup(|app| {
             // Initialize captured text state
             app.manage(CapturedText(Arc::new(Mutex::new(String::new()))));
+            // Initialize popup pinned state
+            app.manage(PopupPinned(Arc::new(Mutex::new(false))));
 
             // Load config to get autostart state
             let store = app.store("config.json")?;
@@ -594,6 +624,8 @@ pub fn run() {
             resize_popup_window,
             toggle_autostart,
             stream_ai_response,
+            set_popup_pinned,
+            is_popup_pinned,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
