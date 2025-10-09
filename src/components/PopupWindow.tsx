@@ -98,9 +98,6 @@ export default function PopupWindow() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [isPinned, setIsPinned] = useState(false);
-  const [currentTemplateAction, setCurrentTemplateAction] = useState<
-    "none" | "copy" | "replace"
-  >("none");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -342,9 +339,6 @@ export default function PopupWindow() {
         return;
       }
     }
-
-    // Store the action to execute after completion
-    setCurrentTemplateAction(actionToExecute);
 
     setIsStreaming(true);
     setCurrentResponse("");

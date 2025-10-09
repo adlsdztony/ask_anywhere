@@ -89,7 +89,7 @@ export default function ConfigPage() {
   const updateTemplate = (
     index: number,
     field: keyof QuestionTemplate,
-    value: string,
+    value: string | null | boolean,
   ) => {
     if (!config) return;
     const newTemplates = [...config.templates];
