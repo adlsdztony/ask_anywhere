@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
-import { loadConfig, getCapturedText, resizePopupWindow } from "../api";
+import {
+  loadConfig,
+  getCapturedText,
+  resizePopupWindow,
+  hidePopupWindow,
+} from "../api";
 import { streamAiResponse } from "../services/aiClient";
 import type { AppConfig } from "../types";
 import "./PopupWindow.css";
@@ -70,6 +75,27 @@ export default function PopupWindow() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Global ESC key handler to close popup window
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        // If suggestions are open, close them first
+        if (showSuggestions) {
+          setShowSuggestions(false);
+        } else if (isDropdownOpen) {
+          // If dropdown is open, close it
+          setIsDropdownOpen(false);
+        } else {
+          // Otherwise close the popup window
+          hidePopupWindow();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    return () => document.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [showSuggestions, isDropdownOpen]);
 
   const initializePopup = async () => {
     try {
@@ -222,12 +248,37 @@ export default function PopupWindow() {
     if (showSuggestions && filteredTemplates.length > 0) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSuggestionIndex((prev) =>
-          prev < filteredTemplates.length - 1 ? prev + 1 : prev,
-        );
+        setSuggestionIndex((prev) => {
+          const newIndex =
+            prev < filteredTemplates.length - 1 ? prev + 1 : prev;
+          // Scroll to the selected suggestion
+          setTimeout(() => {
+            const suggestionElement = suggestionsRef.current?.children[
+              newIndex
+            ] as HTMLElement;
+            suggestionElement?.scrollIntoView({
+              block: "nearest",
+              behavior: "smooth",
+            });
+          }, 0);
+          return newIndex;
+        });
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSuggestionIndex((prev) => (prev > 0 ? prev - 1 : 0));
+        setSuggestionIndex((prev) => {
+          const newIndex = prev > 0 ? prev - 1 : 0;
+          // Scroll to the selected suggestion
+          setTimeout(() => {
+            const suggestionElement = suggestionsRef.current?.children[
+              newIndex
+            ] as HTMLElement;
+            suggestionElement?.scrollIntoView({
+              block: "nearest",
+              behavior: "smooth",
+            });
+          }, 0);
+          return newIndex;
+        });
       } else if (e.key === "Tab") {
         e.preventDefault();
         const selected = filteredTemplates[suggestionIndex];
