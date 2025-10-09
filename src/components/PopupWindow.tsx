@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   loadConfig,
   getCapturedText,
@@ -402,7 +403,9 @@ export default function PopupWindow() {
               <button className="copy-button" onClick={handleCopyResponse}>
                 {copyButtonText}
               </button>
-              <ReactMarkdown>{response}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {response}
+              </ReactMarkdown>
             </div>
           </div>
         )}

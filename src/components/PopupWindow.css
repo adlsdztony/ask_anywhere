@@ -519,3 +519,41 @@ body::-webkit-scrollbar {
     background: transparent;
     padding: 0;
 }
+
+.markdown-content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0;
+    font-size: 13px;
+}
+
+.markdown-content table th,
+.markdown-content table td {
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.markdown-content table th {
+    background: rgba(0, 0, 0, 0.08);
+    font-weight: 600;
+}
+
+.markdown-content table tr:nth-child(even) {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+@media (prefers-color-scheme: dark) {
+    .markdown-content table th,
+    .markdown-content table td {
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .markdown-content table th {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .markdown-content table tr:nth-child(even) {
+        background: rgba(255, 255, 255, 0.04);
+    }
+}
