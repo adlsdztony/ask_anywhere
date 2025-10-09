@@ -319,7 +319,9 @@ export default function PopupWindow() {
 
   return (
     <div className="popup-window">
-      <div className="popup-content">
+      <div
+        className={`popup-content ${showSuggestions ? "with-suggestions" : ""}`}
+      >
         <div className="input-container">
           <button
             className="slash-button"
