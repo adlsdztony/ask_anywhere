@@ -72,7 +72,7 @@ async fn show_popup_window(app: AppHandle) -> Result<(), String> {
 
     // Popup window size (compact initial size)
     const POPUP_WIDTH: f64 = 500.0;
-    const POPUP_HEIGHT: f64 = 150.0; // Smaller initial height
+    const POPUP_HEIGHT: f64 = 130.0; // Smaller initial height
     const OFFSET: i32 = 20;
 
     if let Some(window) = app.get_webview_window("popup") {
