@@ -14,12 +14,15 @@ export default function PopupWindow() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionIndex, setSuggestionIndex] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   // Window size constants
   const COMPACT_WIDTH = 500;
-  const COMPACT_HEIGHT = 130;
+  const COMPACT_HEIGHT = 300;
   const EXPANDED_WIDTH = 500;
   const EXPANDED_HEIGHT = 600;
 
@@ -53,6 +56,13 @@ export default function PopupWindow() {
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setIsDropdownOpen(false);
+      }
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node) &&
+        !inputRef.current?.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
       }
     };
 
@@ -94,23 +104,38 @@ export default function PopupWindow() {
     // Determine the prompt to use
     let finalPrompt = "";
     if (promptOverride !== undefined) {
-      // Use the provided prompt override (from template click)
+      // Use the provided prompt override (from suggestion click)
       finalPrompt = `${promptOverride}\n\n${selectedText}`;
-    } else if (selectedTemplate) {
-      const template = config.templates.find((t) => t.id === selectedTemplate);
-      if (template) {
-        finalPrompt = `${template.prompt}\n\n${selectedText}`;
-      }
-    } else if (customPrompt.trim()) {
-      finalPrompt = `${customPrompt}\n\n${selectedText}`;
     } else {
-      setError("Please select a template or enter a custom prompt.");
-      return;
+      // Check if input starts with "/" to use template
+      const trimmedPrompt = customPrompt.trim();
+      if (trimmedPrompt.startsWith("/")) {
+        const commandName = trimmedPrompt.slice(1).split(" ")[0];
+        const template = config.templates.find(
+          (t) => t.name.toLowerCase() === commandName.toLowerCase(),
+        );
+        if (template) {
+          // Extract any additional text after the command
+          const additionalText = trimmedPrompt
+            .slice(commandName.length + 1)
+            .trim();
+          finalPrompt = `${template.prompt}\n\n${selectedText}${additionalText ? "\n\n" + additionalText : ""}`;
+        } else {
+          setError(`Template "${commandName}" not found.`);
+          return;
+        }
+      } else if (trimmedPrompt) {
+        finalPrompt = `${trimmedPrompt}\n\n${selectedText}`;
+      } else {
+        setError("Please enter a prompt or use a template command.");
+        return;
+      }
     }
 
     setIsStreaming(true);
     setResponse("");
     setError(null);
+    setShowSuggestions(false);
 
     try {
       await streamAiResponse(
@@ -138,14 +163,87 @@ export default function PopupWindow() {
     }
   };
 
-  const handleTemplateClick = (templateId: string) => {
+  const handleSuggestionClick = (templateName: string) => {
     if (isStreaming) return;
 
-    const template = config?.templates.find((t) => t.id === templateId);
+    const template = config?.templates.find((t) => t.name === templateName);
     if (template) {
-      setSelectedTemplate(templateId);
-      setCustomPrompt("");
+      setCustomPrompt(`/${templateName}`);
+      setShowSuggestions(false);
       handleSend(template.prompt);
+    }
+  };
+
+  const getFilteredTemplates = () => {
+    if (!config) return [];
+
+    const input = customPrompt.toLowerCase();
+    if (!input.startsWith("/")) return [];
+
+    const searchTerm = input.slice(1);
+    if (searchTerm === "") return config.templates;
+
+    return config.templates.filter((t) =>
+      t.name.toLowerCase().startsWith(searchTerm),
+    );
+  };
+
+  const handleInputChange = (value: string) => {
+    setCustomPrompt(value);
+    setSelectedTemplate("");
+
+    if (value.startsWith("/")) {
+      setShowSuggestions(true);
+      setSuggestionIndex(0);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSlashButtonClick = () => {
+    if (isStreaming) return;
+
+    if (!customPrompt.startsWith("/")) {
+      setCustomPrompt("/");
+      setShowSuggestions(true);
+      setSuggestionIndex(0);
+    } else {
+      setShowSuggestions(!showSuggestions);
+    }
+
+    // Focus input after clicking
+    inputRef.current?.focus();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const filteredTemplates = getFilteredTemplates();
+
+    if (showSuggestions && filteredTemplates.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSuggestionIndex((prev) =>
+          prev < filteredTemplates.length - 1 ? prev + 1 : prev,
+        );
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSuggestionIndex((prev) => (prev > 0 ? prev - 1 : 0));
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        const selected = filteredTemplates[suggestionIndex];
+        if (selected) {
+          setCustomPrompt(`/${selected.name}`);
+          setShowSuggestions(false);
+        }
+      } else if (e.key === "Escape") {
+        setShowSuggestions(false);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (!isStreaming && customPrompt.trim()) {
+          handleSend();
+        }
+      }
+    } else if (e.key === "Enter" && !isStreaming && customPrompt.trim()) {
+      handleSend();
     }
   };
 
@@ -168,21 +266,23 @@ export default function PopupWindow() {
     <div className="popup-window">
       <div className="popup-content">
         <div className="input-container">
+          <button
+            className="slash-button"
+            onClick={handleSlashButtonClick}
+            disabled={isStreaming}
+            type="button"
+            title="Show template commands"
+          >
+            /
+          </button>
           <input
             ref={inputRef}
             type="text"
             className="custom-prompt"
             value={customPrompt}
-            onChange={(e) => {
-              setCustomPrompt(e.target.value);
-              setSelectedTemplate("");
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !isStreaming && customPrompt.trim()) {
-                handleSend();
-              }
-            }}
-            placeholder="Ask anything..."
+            onChange={(e) => handleInputChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask anything or type / for templates..."
             disabled={isStreaming}
           />
           <div className="custom-dropdown" ref={dropdownRef}>
@@ -218,18 +318,24 @@ export default function PopupWindow() {
           </div>
         </div>
 
-        <div className="template-buttons">
-          {config.templates.map((template) => (
-            <button
-              key={template.id}
-              className={`template-button ${selectedTemplate === template.id ? "active" : ""}`}
-              onClick={() => handleTemplateClick(template.id)}
-              disabled={isStreaming}
-            >
-              {template.name}
-            </button>
-          ))}
-        </div>
+        {showSuggestions && getFilteredTemplates().length > 0 && (
+          <div className="suggestions-menu" ref={suggestionsRef}>
+            {getFilteredTemplates().map((template, index) => (
+              <div
+                key={template.id}
+                className={`suggestion-item ${index === suggestionIndex ? "highlighted" : ""}`}
+                onClick={() => handleSuggestionClick(template.name)}
+                onMouseEnter={() => setSuggestionIndex(index)}
+              >
+                <span className="suggestion-name">/{template.name}</span>
+                <span className="suggestion-desc">
+                  {template.prompt.slice(0, 60)}
+                  {template.prompt.length > 60 ? "..." : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {error && <div className="error-message">{error}</div>}
 
