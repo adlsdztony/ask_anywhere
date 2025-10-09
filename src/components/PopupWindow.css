@@ -478,16 +478,19 @@ body::-webkit-scrollbar {
 .message {
     display: flex;
     width: 100%;
+    min-width: 0;
 }
 
 .message-content {
     position: relative;
     width: 100%;
+    min-width: 0;
     padding: 12px 16px;
     border-radius: 20px;
     word-wrap: break-word;
     overflow-wrap: break-word;
     font-size: 14px;
+    overflow: hidden;
 }
 
 /* User message styling */
@@ -631,6 +634,12 @@ body::-webkit-scrollbar {
 }
 
 /* Markdown content styling */
+.markdown-content {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
 .markdown-content h1,
 .markdown-content h2,
 .markdown-content h3 {
@@ -660,11 +669,43 @@ body::-webkit-scrollbar {
 .code-block-wrapper {
     position: relative;
     background: rgba(0, 0, 0, 0.06);
-    padding: 12px;
-    padding-top: 40px;
     border-radius: 12px;
-    overflow-x: auto;
     margin: 8px 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding-top: 32px;
+}
+
+.code-block-wrapper pre {
+    margin: 0;
+    padding: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.code-block-wrapper code {
+    display: block;
+    width: max-content;
+    min-width: 100%;
+}
+
+.code-block-wrapper pre::-webkit-scrollbar {
+    height: 8px;
+}
+
+.code-block-wrapper pre::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+}
+
+.code-block-wrapper pre::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.code-block-wrapper pre::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
 }
 
 .code-copy-button {
@@ -694,6 +735,18 @@ body::-webkit-scrollbar {
         background: rgba(255, 255, 255, 0.08);
     }
 
+    .code-block-wrapper pre::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .code-block-wrapper pre::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .code-block-wrapper pre::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
     .code-copy-button {
         background: rgba(60, 60, 60, 0.8);
         border-color: rgba(255, 255, 255, 0.2);
@@ -710,18 +763,107 @@ body::-webkit-scrollbar {
     padding: 12px;
     border-radius: 12px;
     overflow-x: auto;
+    overflow-y: hidden;
     margin: 8px 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.markdown-content pre > code {
+    display: block;
+    width: max-content;
+    min-width: 100%;
+}
+
+.markdown-content pre::-webkit-scrollbar {
+    height: 8px;
+}
+
+.markdown-content pre::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+}
+
+.markdown-content pre::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.markdown-content pre::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
 }
 
 @media (prefers-color-scheme: dark) {
     .markdown-content pre {
         background: rgba(255, 255, 255, 0.08);
     }
+
+    .markdown-content pre::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .markdown-content pre::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .markdown-content pre::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
 }
 
 .markdown-content pre code {
     background: transparent;
     padding: 0;
+    white-space: pre;
+    display: block;
+}
+
+/* KaTeX math formula styling */
+.markdown-content .katex {
+    font-size: 1.1em;
+}
+
+.markdown-content .katex-display {
+    margin: 16px 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.markdown-content .katex-display::-webkit-scrollbar {
+    height: 6px;
+}
+
+.markdown-content .katex-display::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 3px;
+}
+
+.markdown-content .katex-display::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.markdown-content .katex-display::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+    .markdown-content .katex {
+        color: #e0e0e0;
+    }
+
+    .markdown-content .katex-display::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .markdown-content .katex-display::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .markdown-content .katex-display::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
 }
 
 .markdown-content table {

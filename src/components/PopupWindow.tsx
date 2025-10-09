@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -18,6 +21,24 @@ import {
 } from "../services/aiClient";
 import type { AppConfig } from "../types";
 import "./PopupWindow.css";
+
+// Preprocess LaTeX delimiters from LLM output
+// Converts LaTeX bracket notation to dollar signs for remark-math
+function preprocessLatex(content: string): string {
+  // Convert block LaTeX: \[ ... \] to $$...$$
+  const blockProcessed = content.replace(
+    /\\\[([\s\S]*?)\\\]/g,
+    (_match, equation) => `$$${equation}$$`,
+  );
+
+  // Convert inline LaTeX: \( ... \) to $...$
+  const inlineProcessed = blockProcessed.replace(
+    /\\\(([\s\S]*?)\\\)/g,
+    (_match, equation) => `$${equation}$`,
+  );
+
+  return inlineProcessed;
+}
 
 // CodeBlock component with copy button
 function CodeBlock({ children }: { children: React.ReactNode }) {
@@ -51,12 +72,12 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <pre className="code-block-wrapper">
+    <div className="code-block-wrapper">
       <button className="code-copy-button" onClick={handleCopy}>
         {copied ? "Copied!" : "Copy"}
       </button>
-      {children}
-    </pre>
+      <pre>{children}</pre>
+    </div>
   );
 }
 
@@ -671,14 +692,15 @@ export default function PopupWindow() {
                     </button>
                   </div>
                   <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
+                    remarkPlugins={[remarkGfm, remarkMath]}
+                    rehypePlugins={[rehypeKatex]}
                     components={{
                       pre: ({ children }) => {
                         return <CodeBlock>{children}</CodeBlock>;
                       },
                     }}
                   >
-                    {currentResponse}
+                    {preprocessLatex(currentResponse)}
                   </ReactMarkdown>
                 </div>
               </div>
@@ -754,14 +776,15 @@ export default function PopupWindow() {
                         </button>
                       </div>
                       <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
+                        remarkPlugins={[remarkGfm, remarkMath]}
+                        rehypePlugins={[rehypeKatex]}
                         components={{
                           pre: ({ children }) => {
                             return <CodeBlock>{children}</CodeBlock>;
                           },
                         }}
                       >
-                        {message.content}
+                        {preprocessLatex(message.content)}
                       </ReactMarkdown>
                     </>
                   ) : (
