@@ -14,7 +14,6 @@ export default function PopupWindow() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [selectedText, setSelectedText] = useState("");
   const [customPrompt, setCustomPrompt] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [response, setResponse] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -217,7 +216,6 @@ export default function PopupWindow() {
 
   const handleInputChange = (value: string) => {
     setCustomPrompt(value);
-    setSelectedTemplate("");
 
     if (value.startsWith("/")) {
       setShowSuggestions(true);
