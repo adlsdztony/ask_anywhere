@@ -45,11 +45,31 @@ npm install
 ```
 
 3. Run in development mode:
+
+```bash
+# for linux user first install prerequisites
+# https://tauri.app/v1/guides/getting-started/prerequisites
+sudo apt update
+sudo apt install libwebkit2gtk-4.0-dev \
+    build-essential \
+    curl \
+    wget \
+    file \
+    libssl-dev \
+    libgtk-3-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev \
+    libjavascriptcoregtk-4.1-dev \
+    libwebkit2gtk-4.1-dev \
+    libxdo-dev
+
+```
+
 ```bash
 npm run tauri dev
 ```
 
-4. Build for production:
+1. Build for production:
 ```bash
 npm run tauri build
 ```
