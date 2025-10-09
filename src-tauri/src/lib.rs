@@ -688,6 +688,7 @@ pub fn run() {
                             let template_id = template.id.clone();
                             let template_prompt = template.prompt.clone();
                             let template_action = template.action.clone();
+                            let background_mode = template.background_mode;
                             let app_clone = app.handle().clone();
 
                             if let Ok(template_shortcut) = hotkey_str.parse::<Shortcut>() {
@@ -709,40 +710,141 @@ pub fn run() {
 
                                             tauri::async_runtime::spawn(async move {
                                                 // Capture the selected text
-                                                match clipboard::capture_selected_text().await {
+                                                let captured_text = match clipboard::capture_selected_text().await {
                                                     Ok(text) => {
                                                         // Store the captured text in state
                                                         let captured_state: tauri::State<CapturedText> = app.state();
-                                                        *captured_state.0.lock().await = text;
+                                                        *captured_state.0.lock().await = text.clone();
+                                                        text
                                                     }
                                                     Err(e) => {
                                                         eprintln!("Warning: Failed to capture selection: {}", e);
+                                                        String::new()
                                                     }
-                                                }
+                                                };
 
-                                                // Show the popup window with template info
-                                                if let Err(e) = show_popup_window(app.clone()).await {
-                                                    eprintln!("Failed to show popup: {}", e);
-                                                    return;
-                                                }
+                                                if background_mode {
+                                                    // Background mode: execute without showing popup
+                                                    println!("Executing template {} in background mode", template_id_inner);
 
-                                                // Wait a bit for the window to be fully loaded
-                                                tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+                                                    // Load config to get model info
+                                                    let store = match app.store("config.json") {
+                                                        Ok(s) => s,
+                                                        Err(e) => {
+                                                            eprintln!("Failed to load config: {}", e);
+                                                            return;
+                                                        }
+                                                    };
 
-                                                // Emit event to trigger template execution
-                                                if let Some(popup) = app.get_webview_window("popup") {
-                                                    println!("Emitting execute-template event for template: {}", template_id_inner);
-                                                    if let Err(e) = popup.emit("execute-template", serde_json::json!({
-                                                        "id": template_id_inner,
-                                                        "prompt": prompt,
-                                                        "action": action,
-                                                    })) {
-                                                        eprintln!("Failed to emit execute-template event: {}", e);
+                                                    let config: AppConfig = match store.get("app_config") {
+                                                        Some(value) => match serde_json::from_value(value.clone()) {
+                                                            Ok(c) => c,
+                                                            Err(e) => {
+                                                                eprintln!("Failed to parse config: {}", e);
+                                                                return;
+                                                            }
+                                                        },
+                                                        None => {
+                                                            eprintln!("No config found");
+                                                            return;
+                                                        }
+                                                    };
+
+                                                    let selected_model = &config.models[config.selected_model_index];
+
+                                                    // Build the full prompt with captured text
+                                                    let full_prompt = if !captured_text.is_empty() {
+                                                        format!("{}\n\n{}", prompt, captured_text)
                                                     } else {
-                                                        println!("Successfully emitted execute-template event");
-                                                    }
+                                                        prompt.clone()
+                                                    };
+
+                                                    // Call AI API directly in background
+                                                    let base_url = selected_model.base_url.clone();
+                                                    let api_key = selected_model.api_key.clone();
+                                                    let model_name = selected_model.model_name.clone();
+                                                    let action_clone = action.clone();
+                                                    let app_for_action = app.clone();
+
+                                                    // Make API call
+                                                    tokio::spawn(async move {
+                                                        use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+
+                                                        let url = if base_url.ends_with('/') {
+                                                            format!("{}chat/completions", base_url)
+                                                        } else {
+                                                            format!("{}/chat/completions", base_url)
+                                                        };
+
+                                                        let mut headers = HeaderMap::new();
+                                                        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+                                                        if let Ok(auth_value) = HeaderValue::from_str(&format!("Bearer {}", api_key)) {
+                                                            headers.insert(AUTHORIZATION, auth_value);
+                                                        }
+
+                                                        let body = serde_json::json!({
+                                                            "model": model_name,
+                                                            "messages": [{"role": "user", "content": full_prompt}],
+                                                            "stream": false
+                                                        });
+
+                                                        let client = reqwest::Client::new();
+                                                        match client.post(&url).headers(headers).json(&body).send().await {
+                                                            Ok(response) => {
+                                                                if response.status().is_success() {
+                                                                    if let Ok(result) = response.json::<serde_json::Value>().await {
+                                                                        if let Some(content) = result["choices"][0]["message"]["content"].as_str() {
+                                                                            println!("Background execution completed. Response length: {}", content.len());
+
+                                                                            // Execute action
+                                                                            if action_clone == "copy" {
+                                                                                use tauri_plugin_clipboard_manager::ClipboardExt;
+                                                                                if let Err(e) = app_for_action.clipboard().write_text(content) {
+                                                                                    eprintln!("Failed to copy to clipboard: {}", e);
+                                                                                } else {
+                                                                                    println!("Copied response to clipboard");
+                                                                                }
+                                                                            } else if action_clone == "replace" {
+                                                                                // Use the replace_text_in_source function
+                                                                                replace_text_in_source(app_for_action, content.to_string());
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                } else {
+                                                                    eprintln!("API error: {}", response.status());
+                                                                }
+                                                            }
+                                                            Err(e) => {
+                                                                eprintln!("Request failed: {}", e);
+                                                            }
+                                                        }
+                                                    });
                                                 } else {
-                                                    eprintln!("Popup window not found when trying to emit event");
+                                                    // Normal mode: show popup and emit event
+                                                    // Show the popup window with template info
+                                                    if let Err(e) = show_popup_window(app.clone()).await {
+                                                        eprintln!("Failed to show popup: {}", e);
+                                                        return;
+                                                    }
+
+                                                    // Wait a bit for the window to be fully loaded
+                                                    tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+
+                                                    // Emit event to trigger template execution
+                                                    if let Some(popup) = app.get_webview_window("popup") {
+                                                        println!("Emitting execute-template event for template: {}", template_id_inner);
+                                                        if let Err(e) = popup.emit("execute-template", serde_json::json!({
+                                                            "id": template_id_inner,
+                                                            "prompt": prompt,
+                                                            "action": action,
+                                                        })) {
+                                                            eprintln!("Failed to emit execute-template event: {}", e);
+                                                        } else {
+                                                            println!("Successfully emitted execute-template event");
+                                                        }
+                                                    } else {
+                                                        eprintln!("Popup window not found when trying to emit event");
+                                                    }
                                                 }
                                             });
                                         }

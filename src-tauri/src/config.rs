@@ -33,6 +33,8 @@ pub struct QuestionTemplate {
     pub action: String,
     #[serde(default)]
     pub hotkey: Option<String>,
+    #[serde(default)]
+    pub background_mode: bool,
 }
 
 fn default_template_action() -> String {
@@ -60,6 +62,7 @@ impl Default for AppConfig {
                     prompt: "Translate the following text to English:".to_string(),
                     action: "replace".to_string(),
                     hotkey: None,
+                    background_mode: false,
                 },
                 QuestionTemplate {
                     id: "explain".to_string(),
@@ -67,6 +70,7 @@ impl Default for AppConfig {
                     prompt: "Explain the following:".to_string(),
                     action: "none".to_string(),
                     hotkey: None,
+                    background_mode: false,
                 },
                 QuestionTemplate {
                     id: "summarize".to_string(),
@@ -74,6 +78,7 @@ impl Default for AppConfig {
                     prompt: "Summarize the following text:".to_string(),
                     action: "copy".to_string(),
                     hotkey: None,
+                    background_mode: false,
                 },
             ],
             hotkeys: HotkeyConfig {

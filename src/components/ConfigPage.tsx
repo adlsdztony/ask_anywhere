@@ -81,6 +81,7 @@ export default function ConfigPage() {
       prompt: "Your prompt here...",
       action: "none",
       hotkey: null,
+      background_mode: false,
     };
     setConfig({ ...config, templates: [...config.templates, newTemplate] });
   };
@@ -313,6 +314,27 @@ export default function ConfigPage() {
                     <br />
                     Note: You need to restart the app for hotkey changes to take
                     effect.
+                  </p>
+                </div>
+                <div className="form-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={template.background_mode || false}
+                      onChange={(e) =>
+                        updateTemplate(
+                          index,
+                          "background_mode",
+                          e.target.checked,
+                        )
+                      }
+                    />
+                    <span>Run in background (no popup window)</span>
+                  </label>
+                  <p className="help-text">
+                    When enabled, pressing the hotkey will execute the template in
+                    the background without showing the popup window. The result
+                    will automatically perform the configured action (copy/replace).
                   </p>
                 </div>
               </div>

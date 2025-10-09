@@ -19,6 +19,7 @@ export interface QuestionTemplate {
   prompt: string;
   action: "none" | "copy" | "replace";
   hotkey?: string | null;
+  background_mode?: boolean;
 }
 
 export interface HotkeyConfig {
