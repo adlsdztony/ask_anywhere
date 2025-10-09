@@ -402,58 +402,64 @@ async fn is_popup_pinned(state: State<'_, PopupPinned>) -> Result<bool, String> 
 }
 
 #[tauri::command]
-async fn replace_text_in_source(app: AppHandle, text: String) -> Result<(), String> {
-    use tauri_plugin_clipboard_manager::ClipboardExt;
+fn replace_text_in_source(app: AppHandle, text: String) {
+    // Spawn a background task that doesn't block or return
+    tauri::async_runtime::spawn(async move {
+        use tauri_plugin_clipboard_manager::ClipboardExt;
 
-    // Save current clipboard content first (before hiding window)
-    let original_clipboard = app.clipboard().read_text().ok();
+        // Save current clipboard content first (before hiding window)
+        let original_clipboard = app.clipboard().read_text().ok();
 
-    // Write the new text to clipboard
-    app.clipboard()
-        .write_text(text)
-        .map_err(|e| format!("Failed to write to clipboard: {}", e))?;
+        // Write the new text to clipboard
+        if let Err(e) = app.clipboard().write_text(text) {
+            eprintln!("Failed to write to clipboard: {}", e);
+            return;
+        }
 
-    // Small delay to ensure clipboard is updated
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Small delay to ensure clipboard is updated
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    // Hide the popup window to return focus to the original application
-    if let Some(popup) = app.get_webview_window("popup") {
-        let _ = popup.hide(); // Ignore errors since window might be closing
-    }
+        // Hide the popup window to return focus to the original application
+        if let Some(popup) = app.get_webview_window("popup") {
+            let _ = popup.hide();
+        }
 
-    // Wait for window to hide and focus to return
-    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+        // Wait for window to hide and focus to return
+        tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
 
-    // Simulate Ctrl+V to paste
-    tokio::task::spawn_blocking(|| -> Result<(), String> {
-        let mut enigo = Enigo::new(&Settings::default())
-            .map_err(|e| format!("Failed to initialize enigo: {:?}", e))?;
+        // Simulate Ctrl+V to paste
+        let paste_result = tokio::task::spawn_blocking(|| -> Result<(), String> {
+            let mut enigo = Enigo::new(&Settings::default())
+                .map_err(|e| format!("Failed to initialize enigo: {:?}", e))?;
 
-        // Simulate Ctrl+V
-        enigo
-            .key(Key::Control, Press)
-            .map_err(|e| format!("Failed to press Ctrl: {:?}", e))?;
-        enigo
-            .key(Key::Unicode('v'), Click)
-            .map_err(|e| format!("Failed to press V: {:?}", e))?;
-        enigo
-            .key(Key::Control, Release)
-            .map_err(|e| format!("Failed to release Ctrl: {:?}", e))?;
+            // Simulate Ctrl+V
+            enigo
+                .key(Key::Control, Press)
+                .map_err(|e| format!("Failed to press Ctrl: {:?}", e))?;
+            enigo
+                .key(Key::Unicode('v'), Click)
+                .map_err(|e| format!("Failed to press V: {:?}", e))?;
+            enigo
+                .key(Key::Control, Release)
+                .map_err(|e| format!("Failed to release Ctrl: {:?}", e))?;
 
-        Ok(())
-    })
-    .await
-    .map_err(|e| format!("Task join error: {}", e))??;
+            Ok(())
+        })
+        .await;
 
-    // Wait a bit before restoring clipboard
-    tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+        if let Err(e) = paste_result {
+            eprintln!("Keyboard simulation failed: {:?}", e);
+            return;
+        }
 
-    // Restore original clipboard
-    if let Some(original) = original_clipboard {
-        let _ = app.clipboard().write_text(original);
-    }
+        // Wait a bit before restoring clipboard
+        tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
 
-    Ok(())
+        // Restore original clipboard
+        if let Some(original) = original_clipboard {
+            let _ = app.clipboard().write_text(original);
+        }
+    });
 }
 
 #[tauri::command]

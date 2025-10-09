@@ -328,20 +328,17 @@ export default function PopupWindow() {
     e.preventDefault();
     e.stopPropagation();
     if (response) {
-      try {
-        setReplaceButtonText("Replacing...");
-        await replaceTextInSource(response);
-        setReplaceButtonText("Replaced!");
-        setTimeout(() => {
-          setReplaceButtonText("Replace");
-        }, 1500);
-      } catch (err) {
+      setReplaceButtonText("Replacing...");
+
+      // Fire and forget - don't wait for response since window will close
+      replaceTextInSource(response).catch((err) => {
         console.error("Failed to replace:", err);
-        setReplaceButtonText("Failed");
-        setTimeout(() => {
-          setReplaceButtonText("Replace");
-        }, 1500);
-      }
+      });
+
+      // Close the window immediately after triggering replace
+      setTimeout(() => {
+        hidePopupWindow().catch(console.error);
+      }, 50);
     }
   };
 
