@@ -3,6 +3,8 @@ mod config;
 
 use auto_launch::AutoLaunch;
 use config::AppConfig;
+use enigo::Direction::{Click, Press, Release};
+use enigo::{Enigo, Key, Keyboard, Settings};
 use futures::StreamExt;
 use std::sync::Arc;
 use tauri::ipc::Channel;
@@ -400,6 +402,63 @@ async fn is_popup_pinned(state: State<'_, PopupPinned>) -> Result<bool, String> 
 }
 
 #[tauri::command]
+async fn replace_text_in_source(app: AppHandle, text: String) -> Result<(), String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+
+    // Hide the popup window first to return focus to the original application
+    if let Some(popup) = app.get_webview_window("popup") {
+        popup
+            .hide()
+            .map_err(|e| format!("Failed to hide popup: {}", e))?;
+    }
+
+    // Wait for window to hide and focus to return
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    // Save current clipboard content
+    let original_clipboard = app.clipboard().read_text().ok();
+
+    // Write the new text to clipboard
+    app.clipboard()
+        .write_text(text)
+        .map_err(|e| format!("Failed to write to clipboard: {}", e))?;
+
+    // Small delay to ensure clipboard is updated
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Simulate Ctrl+V to paste
+    tokio::task::spawn_blocking(|| -> Result<(), String> {
+        let mut enigo = Enigo::new(&Settings::default())
+            .map_err(|e| format!("Failed to initialize enigo: {:?}", e))?;
+
+        // Simulate Ctrl+V
+        enigo
+            .key(Key::Control, Press)
+            .map_err(|e| format!("Failed to press Ctrl: {:?}", e))?;
+        enigo
+            .key(Key::Unicode('v'), Click)
+            .map_err(|e| format!("Failed to press V: {:?}", e))?;
+        enigo
+            .key(Key::Control, Release)
+            .map_err(|e| format!("Failed to release Ctrl: {:?}", e))?;
+
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))??;
+
+    // Wait a bit before restoring clipboard
+    tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+
+    // Optional: Restore original clipboard
+    if let Some(original) = original_clipboard {
+        let _ = app.clipboard().write_text(original);
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn resize_popup_window(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("popup") {
         // Get current position and monitor info
@@ -626,6 +685,7 @@ pub fn run() {
             stream_ai_response,
             set_popup_pinned,
             is_popup_pinned,
+            replace_text_in_source,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -35,3 +35,7 @@ export async function setPopupPinned(pinned: boolean): Promise<void> {
 export async function isPopupPinned(): Promise<boolean> {
   return await invoke<boolean>("is_popup_pinned");
 }
+
+export async function replaceTextInSource(text: string): Promise<void> {
+  await invoke("replace_text_in_source", { text });
+}

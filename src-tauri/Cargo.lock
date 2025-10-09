@@ -107,6 +107,7 @@ dependencies = [
  "anyhow",
  "auto-launch",
  "bytes",
+ "enigo",
  "futures",
  "mouse_position",
  "reqwest",

@@ -483,20 +483,41 @@ body::-webkit-scrollbar {
     }
 }
 
-.copy-button {
+/* Action buttons container */
+.action-buttons {
     position: absolute;
     top: 10px;
     right: 10px;
+    display: flex;
+    gap: 6px;
+    z-index: 100;
+}
+
+.replace-button,
+.copy-button {
     padding: 4px 12px;
-    background: rgba(255, 255, 255, 0.6);
     backdrop-filter: blur(15px);
     border: 1.5px solid rgba(0, 0, 0, 0.1);
     border-radius: 50px;
     font-size: 9px;
-    color: #555;
     cursor: pointer;
     transition: all 0.2s ease;
-    z-index: 100;
+}
+
+.replace-button {
+    background: rgba(100, 200, 100, 0.6);
+    color: #2d5a2d;
+}
+
+.replace-button:hover {
+    background: rgba(100, 200, 100, 0.8);
+    border-color: rgba(50, 150, 50, 0.3);
+    transform: translateY(-1px);
+}
+
+.copy-button {
+    background: rgba(255, 255, 255, 0.6);
+    color: #555;
 }
 
 .copy-button:hover {
@@ -506,6 +527,16 @@ body::-webkit-scrollbar {
 }
 
 @media (prefers-color-scheme: dark) {
+    .replace-button {
+        background: rgba(80, 160, 80, 0.7);
+        border-color: rgba(100, 200, 100, 0.25);
+        color: #b0e0b0;
+    }
+
+    .replace-button:hover {
+        background: rgba(90, 180, 90, 0.85);
+    }
+
     .copy-button {
         background: rgba(80, 80, 80, 0.7);
         border-color: rgba(255, 255, 255, 0.25);

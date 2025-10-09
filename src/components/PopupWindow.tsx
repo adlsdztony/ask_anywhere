@@ -9,6 +9,7 @@ import {
   hidePopupWindow,
   setPopupPinned,
   isPopupPinned,
+  replaceTextInSource,
 } from "../api";
 import { streamAiResponse } from "../services/aiClient";
 import type { AppConfig } from "../types";
@@ -25,6 +26,7 @@ export default function PopupWindow() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [copyButtonText, setCopyButtonText] = useState("Copy");
+  const [replaceButtonText, setReplaceButtonText] = useState("Replace");
   const [isPinned, setIsPinned] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -322,6 +324,27 @@ export default function PopupWindow() {
     }
   };
 
+  const handleReplaceResponse = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (response) {
+      try {
+        setReplaceButtonText("Replacing...");
+        await replaceTextInSource(response);
+        setReplaceButtonText("Replaced!");
+        setTimeout(() => {
+          setReplaceButtonText("Replace");
+        }, 1500);
+      } catch (err) {
+        console.error("Failed to replace:", err);
+        setReplaceButtonText("Failed");
+        setTimeout(() => {
+          setReplaceButtonText("Replace");
+        }, 1500);
+      }
+    }
+  };
+
   const handlePinClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -490,9 +513,17 @@ export default function PopupWindow() {
         {response && (
           <div className="response-section">
             <div className="response-text markdown-content">
-              <button className="copy-button" onClick={handleCopyResponse}>
-                {copyButtonText}
-              </button>
+              <div className="action-buttons">
+                <button
+                  className="replace-button"
+                  onClick={handleReplaceResponse}
+                >
+                  {replaceButtonText}
+                </button>
+                <button className="copy-button" onClick={handleCopyResponse}>
+                  {copyButtonText}
+                </button>
+              </div>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {response}
               </ReactMarkdown>
