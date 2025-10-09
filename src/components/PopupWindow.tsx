@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
-import { loadConfig, getCapturedText } from "../api";
+import { loadConfig, getCapturedText, resizePopupWindow } from "../api";
 import { streamAiResponse } from "../services/aiClient";
 import type { AppConfig } from "../types";
 import "./PopupWindow.css";
@@ -15,10 +15,36 @@ export default function PopupWindow() {
   const [error, setError] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Window size constants
+  const COMPACT_WIDTH = 500;
+  const COMPACT_HEIGHT = 150;
+  const EXPANDED_WIDTH = 500;
+  const EXPANDED_HEIGHT = 600;
 
   useEffect(() => {
     initializePopup();
   }, []);
+
+  // Resize window when response state changes
+  useEffect(() => {
+    const handleResize = async () => {
+      try {
+        if (response) {
+          // Expand window when response is available
+          await resizePopupWindow(EXPANDED_WIDTH, EXPANDED_HEIGHT);
+        } else {
+          // Compact window when no response
+          await resizePopupWindow(COMPACT_WIDTH, COMPACT_HEIGHT);
+        }
+      } catch (err) {
+        console.error("Failed to resize window:", err);
+      }
+    };
+
+    handleResize();
+  }, [response]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -45,6 +71,11 @@ export default function PopupWindow() {
       if (capturedText) {
         setSelectedText(capturedText);
       }
+
+      // Auto-focus input field after a short delay
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     } catch (err) {
       console.error("Failed to initialize popup:", err);
       setError("Failed to initialize. Please try again.");
@@ -138,6 +169,7 @@ export default function PopupWindow() {
       <div className="popup-content">
         <div className="input-container">
           <input
+            ref={inputRef}
             type="text"
             className="custom-prompt"
             value={customPrompt}

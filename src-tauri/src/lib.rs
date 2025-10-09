@@ -70,9 +70,9 @@ async fn show_popup_window(app: AppHandle) -> Result<(), String> {
     // Get cursor position in physical pixels
     let (cursor_x, cursor_y) = get_cursor_position()?;
 
-    // Popup window size
+    // Popup window size (compact initial size)
     const POPUP_WIDTH: f64 = 500.0;
-    const POPUP_HEIGHT: f64 = 600.0;
+    const POPUP_HEIGHT: f64 = 150.0; // Smaller initial height
     const OFFSET: i32 = 20;
 
     if let Some(window) = app.get_webview_window("popup") {
@@ -227,6 +227,84 @@ async fn hide_popup_window(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn resize_popup_window(app: AppHandle, width: f64, height: f64) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("popup") {
+        // Get current position and monitor info
+        let current_pos = window.outer_position().map_err(|e| e.to_string())?;
+
+        let monitor = window
+            .current_monitor()
+            .map_err(|e| e.to_string())?
+            .ok_or("Failed to get current monitor")?;
+
+        let scale_factor = monitor.scale_factor();
+        let monitor_size = monitor.size();
+        let monitor_position = monitor.position();
+
+        // Get current size
+        let current_size = window.outer_size().map_err(|e| e.to_string())?;
+        let current_height = (current_size.height as f64) / scale_factor;
+
+        // Calculate the height difference
+        let height_diff = height - current_height;
+
+        // Set new size
+        window
+            .set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }))
+            .map_err(|e| e.to_string())?;
+
+        // Adjust position to prevent content from going off-screen
+        // Convert current position to logical coordinates
+        let current_x = (current_pos.x as f64) / scale_factor;
+        let current_y = (current_pos.y as f64) / scale_factor;
+
+        let mut new_x = current_x;
+        let mut new_y = current_y;
+
+        // Check if window would exceed bottom boundary with new height
+        let new_bottom = current_y + height;
+        let monitor_bottom =
+            ((monitor_position.y + monitor_size.height as i32) as f64) / scale_factor;
+
+        if new_bottom > monitor_bottom {
+            // Move window up to keep bottom edge visible
+            new_y = monitor_bottom - height;
+        }
+
+        // Check if window would exceed right boundary
+        let new_right = current_x + width;
+        let monitor_right =
+            ((monitor_position.x + monitor_size.width as i32) as f64) / scale_factor;
+
+        if new_right > monitor_right {
+            new_x = monitor_right - width;
+        }
+
+        // Ensure window doesn't go off-screen to the left or top
+        let monitor_left = (monitor_position.x as f64) / scale_factor;
+        let monitor_top = (monitor_position.y as f64) / scale_factor;
+
+        if new_x < monitor_left {
+            new_x = monitor_left;
+        }
+        if new_y < monitor_top {
+            new_y = monitor_top;
+        }
+
+        // Update position if it changed
+        if new_x != current_x || new_y != current_y {
+            window
+                .set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                    x: new_x,
+                    y: new_y,
+                }))
+                .map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -353,6 +431,7 @@ pub fn run() {
             get_captured_text,
             show_popup_window,
             hide_popup_window,
+            resize_popup_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

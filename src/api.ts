@@ -20,3 +20,10 @@ export async function hidePopupWindow(): Promise<void> {
 export async function getCapturedText(): Promise<string> {
   return await invoke<string>("get_captured_text");
 }
+
+export async function resizePopupWindow(
+  width: number,
+  height: number,
+): Promise<void> {
+  await invoke("resize_popup_window", { width, height });
+}
