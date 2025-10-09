@@ -8,6 +8,12 @@ pub struct AppConfig {
     pub selected_model_index: usize,
     #[serde(default)]
     pub autostart: bool,
+    #[serde(default = "default_popup_width")]
+    pub popup_width: f64,
+}
+
+fn default_popup_width() -> f64 {
+    500.0
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,6 +29,14 @@ pub struct QuestionTemplate {
     pub id: String,
     pub name: String,
     pub prompt: String,
+    #[serde(default = "default_template_action")]
+    pub action: String,
+    #[serde(default)]
+    pub hotkey: Option<String>,
+}
+
+fn default_template_action() -> String {
+    "none".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,16 +58,22 @@ impl Default for AppConfig {
                     id: "translate".to_string(),
                     name: "Translate to English".to_string(),
                     prompt: "Translate the following text to English:".to_string(),
+                    action: "replace".to_string(),
+                    hotkey: None,
                 },
                 QuestionTemplate {
                     id: "explain".to_string(),
                     name: "Explain".to_string(),
                     prompt: "Explain the following:".to_string(),
+                    action: "none".to_string(),
+                    hotkey: None,
                 },
                 QuestionTemplate {
                     id: "summarize".to_string(),
                     name: "Summarize".to_string(),
                     prompt: "Summarize the following text:".to_string(),
+                    action: "copy".to_string(),
+                    hotkey: None,
                 },
             ],
             hotkeys: HotkeyConfig {
@@ -61,6 +81,7 @@ impl Default for AppConfig {
             },
             selected_model_index: 0,
             autostart: false,
+            popup_width: 500.0,
         }
     }
 }

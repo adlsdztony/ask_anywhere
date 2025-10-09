@@ -8,7 +8,7 @@ export default function ConfigPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "models" | "templates" | "hotkeys"
+    "models" | "templates" | "hotkeys" | "appearance"
   >("models");
 
   useEffect(() => {
@@ -79,6 +79,8 @@ export default function ConfigPage() {
       id: `template_${Date.now()}`,
       name: "New Template",
       prompt: "Your prompt here...",
+      action: "none",
+      hotkey: null,
     };
     setConfig({ ...config, templates: [...config.templates, newTemplate] });
   };
@@ -135,6 +137,12 @@ export default function ConfigPage() {
           onClick={() => setActiveTab("hotkeys")}
         >
           Hotkeys
+        </button>
+        <button
+          className={activeTab === "appearance" ? "tab active" : "tab"}
+          onClick={() => setActiveTab("appearance")}
+        >
+          Appearance
         </button>
       </div>
 
@@ -266,6 +274,47 @@ export default function ConfigPage() {
                     rows={3}
                   />
                 </div>
+                <div className="form-group">
+                  <label>Action after completion:</label>
+                  <select
+                    value={template.action}
+                    onChange={(e) =>
+                      updateTemplate(
+                        index,
+                        "action",
+                        e.target.value as "none" | "copy" | "replace",
+                      )
+                    }
+                  >
+                    <option value="none">None - Keep popup open</option>
+                    <option value="copy">Copy - Copy response to clipboard</option>
+                    <option value="replace">
+                      Replace - Replace selected text with response
+                    </option>
+                  </select>
+                  <p className="help-text">
+                    Choose what happens automatically when the AI finishes
+                    responding.
+                  </p>
+                </div>
+                <div className="form-group">
+                  <label>Hotkey (optional):</label>
+                  <input
+                    type="text"
+                    value={template.hotkey || ""}
+                    onChange={(e) =>
+                      updateTemplate(index, "hotkey", e.target.value || null)
+                    }
+                    placeholder="e.g., Alt+T, Ctrl+Shift+E"
+                  />
+                  <p className="help-text">
+                    Set a custom hotkey to trigger this template directly.
+                    Examples: Alt+T, Ctrl+Shift+E, CommandOrControl+Q
+                    <br />
+                    Note: You need to restart the app for hotkey changes to take
+                    effect.
+                  </p>
+                </div>
               </div>
             ))}
           </div>
@@ -295,6 +344,31 @@ export default function ConfigPage() {
                 <br />
                 Note: You need to restart the app for hotkey changes to take
                 effect.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "appearance" && (
+          <div className="appearance-section">
+            <h2>Appearance Settings</h2>
+            <div className="form-group">
+              <label>Popup Width (px):</label>
+              <input
+                type="number"
+                min="300"
+                max="1200"
+                value={config.popup_width}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    popup_width: Number(e.target.value),
+                  })
+                }
+              />
+              <p className="help-text">
+                Set the initial width of the popup window (300-1200px). Default:
+                500px
               </p>
             </div>
           </div>

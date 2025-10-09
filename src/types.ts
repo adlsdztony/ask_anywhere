@@ -3,6 +3,7 @@ export interface AppConfig {
   templates: QuestionTemplate[];
   hotkeys: HotkeyConfig;
   selected_model_index: number;
+  popup_width: number;
 }
 
 export interface ModelConfig {
@@ -16,6 +17,8 @@ export interface QuestionTemplate {
   id: string;
   name: string;
   prompt: string;
+  action: "none" | "copy" | "replace";
+  hotkey?: string | null;
 }
 
 export interface HotkeyConfig {

@@ -98,22 +98,25 @@ export default function PopupWindow() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [isPinned, setIsPinned] = useState(false);
+  const [currentTemplateAction, setCurrentTemplateAction] = useState<
+    "none" | "copy" | "replace"
+  >("none");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const capturedTextRef = useRef<string>("");
 
-  // Window size constants
-  const COMPACT_WIDTH = 500;
+  // Window size - use configured width or default to 500
+  const POPUP_WIDTH = config?.popup_width || 500;
   const COMPACT_HEIGHT = 200;
-  const EXPANDED_WIDTH = 500;
   const EXPANDED_HEIGHT = 600;
 
   useEffect(() => {
     initializePopup();
 
     // Listen for trigger-replace event from backend
-    const unlisten = listen("trigger-replace", () => {
+    const unlistenReplace = listen("trigger-replace", () => {
       // Get the latest assistant message
       const latestAssistantMessage = messages.find(
         (m) => m.role === "assistant",
@@ -125,9 +128,65 @@ export default function PopupWindow() {
     });
 
     return () => {
-      unlisten.then((fn) => fn());
+      unlistenReplace.then((fn) => fn());
     };
   }, [messages]);
+
+  // Separate effect for execute-template event - only set up when config is loaded
+  useEffect(() => {
+    if (!config) {
+      console.log("Config not loaded yet, skipping execute-template listener setup");
+      return;
+    }
+
+    console.log("Setting up execute-template event listener");
+
+    // Listen for execute-template event from backend (triggered by template hotkey)
+    const unlistenTemplate = listen<{
+      id: string;
+      prompt: string;
+      action: string;
+    }>("execute-template", async (event) => {
+      console.log("=== Received execute-template event ===");
+      console.log("Event payload:", event.payload);
+      const { prompt, action } = event.payload;
+
+      // Wait to ensure popup is fully initialized and text is captured
+      console.log("Waiting for popup to initialize and text to be captured...");
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Get the captured text and update both state and ref
+      try {
+        const capturedText = await getCapturedText();
+        console.log("Captured text:", capturedText);
+        if (capturedText) {
+          setSelectedText(capturedText);
+          capturedTextRef.current = capturedText; // Store in ref immediately
+        }
+      } catch (err) {
+        console.error("Failed to get captured text:", err);
+      }
+
+      console.log("Preparing to call handleSend");
+      console.log("- Template prompt:", prompt);
+      console.log("- Action:", action);
+      console.log("- Captured text from ref:", capturedTextRef.current);
+
+      // Call handleSend with just the template prompt
+      // handleSend will automatically combine it with selectedText for first message
+      try {
+        await handleSend(prompt, action as "none" | "copy" | "replace");
+        console.log("handleSend completed successfully");
+      } catch (err) {
+        console.error("Error calling handleSend:", err);
+      }
+    });
+
+    return () => {
+      console.log("Cleaning up execute-template event listener");
+      unlistenTemplate.then((fn) => fn());
+    };
+  }, [config]); // Re-register when config changes
 
   // Resize window when messages change
   useEffect(() => {
@@ -135,10 +194,10 @@ export default function PopupWindow() {
       try {
         if (messages.length > 0 || currentResponse) {
           // Expand window when there are messages or streaming
-          await resizePopupWindow(EXPANDED_WIDTH, EXPANDED_HEIGHT);
+          await resizePopupWindow(POPUP_WIDTH, EXPANDED_HEIGHT);
         } else {
           // Compact window when no messages
-          await resizePopupWindow(COMPACT_WIDTH, COMPACT_HEIGHT);
+          await resizePopupWindow(POPUP_WIDTH, COMPACT_HEIGHT);
         }
       } catch (err) {
         console.error("Failed to resize window:", err);
@@ -146,7 +205,7 @@ export default function PopupWindow() {
     };
 
     handleResize();
-  }, [messages.length, currentResponse]);
+  }, [messages.length, currentResponse, POPUP_WIDTH]);
 
   // Auto-scroll to top when new messages are added
   useEffect(() => {
@@ -207,6 +266,7 @@ export default function PopupWindow() {
       const capturedText = await getCapturedText();
       if (capturedText) {
         setSelectedText(capturedText);
+        capturedTextRef.current = capturedText; // Store in ref for immediate access
       }
 
       // Load pinned state
@@ -223,7 +283,10 @@ export default function PopupWindow() {
     }
   };
 
-  const handleSend = async (promptOverride?: string) => {
+  const handleSend = async (
+    promptOverride?: string,
+    templateAction?: "none" | "copy" | "replace",
+  ) => {
     if (!config) return;
 
     const selectedModel = config.models[config.selected_model_index];
@@ -232,15 +295,19 @@ export default function PopupWindow() {
       return;
     }
 
-    // Determine the prompt to use
+    // Determine the prompt to use and track template action
     let finalPrompt = "";
+    let actionToExecute: "none" | "copy" | "replace" = "none";
     const isFirstMessage = messages.length === 0;
 
     if (promptOverride !== undefined) {
-      // Use the provided prompt override (from suggestion click)
+      // Use the provided prompt override (from suggestion click or template hotkey)
+      // Use capturedTextRef as fallback if selectedText state hasn't updated yet
+      const textToUse = selectedText || capturedTextRef.current;
       finalPrompt = isFirstMessage
-        ? `${promptOverride}\n\n${selectedText}`
+        ? `${promptOverride}\n\n${textToUse}`
         : promptOverride;
+      actionToExecute = templateAction || "none";
     } else {
       // Check if input starts with "/" to use template
       const trimmedPrompt = customPrompt.trim();
@@ -261,6 +328,7 @@ export default function PopupWindow() {
               ? `${template.prompt}\n\n${additionalText}`
               : template.prompt;
           }
+          actionToExecute = template.action;
         } else {
           setError(`Template "${commandName}" not found.`);
           return;
@@ -274,6 +342,9 @@ export default function PopupWindow() {
         return;
       }
     }
+
+    // Store the action to execute after completion
+    setCurrentTemplateAction(actionToExecute);
 
     setIsStreaming(true);
     setCurrentResponse("");
@@ -308,7 +379,7 @@ export default function PopupWindow() {
             setIsStreaming(false);
             setCurrentResponse("");
           },
-          onDone: () => {
+          onDone: async () => {
             // Add assistant response to messages
             setMessages((prev) => [
               { role: "assistant", content: accumulatedResponse },
@@ -317,6 +388,17 @@ export default function PopupWindow() {
             setCurrentResponse("");
             setCustomPrompt("");
             setIsStreaming(false);
+
+            // Execute the template action if specified
+            if (actionToExecute === "copy") {
+              try {
+                await navigator.clipboard.writeText(accumulatedResponse);
+              } catch (err) {
+                console.error("Failed to copy:", err);
+              }
+            } else if (actionToExecute === "replace") {
+              handleReplaceResponseInternal(accumulatedResponse);
+            }
           },
         },
       );
@@ -335,7 +417,7 @@ export default function PopupWindow() {
     if (template) {
       setCustomPrompt(`/${templateName}`);
       setShowSuggestions(false);
-      handleSend(template.prompt);
+      handleSend(template.prompt, template.action);
     }
   };
 

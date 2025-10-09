@@ -213,8 +213,11 @@ async fn show_popup_window(app: AppHandle) -> Result<(), String> {
     // Get cursor position in physical pixels
     let (cursor_x, cursor_y) = get_cursor_position()?;
 
+    // Load config to get popup width
+    let config = load_config(app.clone()).await?;
+    let popup_width = config.popup_width;
+
     // Popup window size (compact initial size)
-    const POPUP_WIDTH: f64 = 500.0;
     const POPUP_HEIGHT: f64 = 200.0; // Smaller initial height
     const OFFSET: i32 = 20;
 
@@ -234,11 +237,11 @@ async fn show_popup_window(app: AppHandle) -> Result<(), String> {
         let mut popup_y = cursor_y + OFFSET;
 
         // Check if popup would exceed right boundary
-        if popup_x + (POPUP_WIDTH * scale_factor) as i32
+        if popup_x + (popup_width * scale_factor) as i32
             > monitor_position.x + monitor_size.width as i32
         {
             // Move to left of cursor
-            popup_x = cursor_x - OFFSET - (POPUP_WIDTH * scale_factor) as i32;
+            popup_x = cursor_x - OFFSET - (popup_width * scale_factor) as i32;
         }
 
         // Check if popup would exceed bottom boundary
@@ -279,7 +282,7 @@ async fn show_popup_window(app: AppHandle) -> Result<(), String> {
             tauri::WebviewUrl::App("popup.html".into()),
         )
         .title("Ask Anywhere")
-        .inner_size(POPUP_WIDTH, POPUP_HEIGHT)
+        .inner_size(popup_width, POPUP_HEIGHT)
         .resizable(true)
         .decorations(false)
         .always_on_top(true)
@@ -306,11 +309,11 @@ async fn show_popup_window(app: AppHandle) -> Result<(), String> {
         let mut popup_y = cursor_y + OFFSET;
 
         // Check if popup would exceed right boundary
-        if popup_x + (POPUP_WIDTH * scale_factor) as i32
+        if popup_x + (popup_width * scale_factor) as i32
             > monitor_position.x + monitor_size.width as i32
         {
             // Move to left of cursor
-            popup_x = cursor_x - OFFSET - (POPUP_WIDTH * scale_factor) as i32;
+            popup_x = cursor_x - OFFSET - (popup_width * scale_factor) as i32;
         }
 
         // Check if popup would exceed bottom boundary
@@ -628,7 +631,7 @@ pub fn run() {
                     let _ = app.global_shortcut().unregister(shortcut.clone());
                 }
 
-                // Register the shortcut handler
+                // Register the popup shortcut handler
                 match app.global_shortcut().on_shortcut(
                     shortcut.clone(),
                     move |_app, _shortcut, event| {
@@ -675,6 +678,89 @@ pub fn run() {
                     Err(e) => {
                         eprintln!("Warning: Failed to setup shortcut handler: {}. The shortcut may not work.", e);
                         // Don't fail the app startup, just log the error
+                    }
+                }
+
+                // Register template hotkeys
+                for template in config.templates.iter() {
+                    if let Some(hotkey_str) = &template.hotkey {
+                        if !hotkey_str.is_empty() {
+                            let template_id = template.id.clone();
+                            let template_prompt = template.prompt.clone();
+                            let template_action = template.action.clone();
+                            let app_clone = app.handle().clone();
+
+                            if let Ok(template_shortcut) = hotkey_str.parse::<Shortcut>() {
+                                // Check if already registered and unregister first
+                                if app.global_shortcut().is_registered(template_shortcut.clone()) {
+                                    eprintln!("Template shortcut {} already registered, skipping...", hotkey_str);
+                                    continue;
+                                }
+
+                                // Register template shortcut handler
+                                match app.global_shortcut().on_shortcut(
+                                    template_shortcut.clone(),
+                                    move |_app, _shortcut, event| {
+                                        if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                                            let app = app_clone.clone();
+                                            let prompt = template_prompt.clone();
+                                            let action = template_action.clone();
+                                            let template_id_inner = template_id.clone();
+
+                                            tauri::async_runtime::spawn(async move {
+                                                // Capture the selected text
+                                                match clipboard::capture_selected_text().await {
+                                                    Ok(text) => {
+                                                        // Store the captured text in state
+                                                        let captured_state: tauri::State<CapturedText> = app.state();
+                                                        *captured_state.0.lock().await = text;
+                                                    }
+                                                    Err(e) => {
+                                                        eprintln!("Warning: Failed to capture selection: {}", e);
+                                                    }
+                                                }
+
+                                                // Show the popup window with template info
+                                                if let Err(e) = show_popup_window(app.clone()).await {
+                                                    eprintln!("Failed to show popup: {}", e);
+                                                    return;
+                                                }
+
+                                                // Wait a bit for the window to be fully loaded
+                                                tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+
+                                                // Emit event to trigger template execution
+                                                if let Some(popup) = app.get_webview_window("popup") {
+                                                    println!("Emitting execute-template event for template: {}", template_id_inner);
+                                                    if let Err(e) = popup.emit("execute-template", serde_json::json!({
+                                                        "id": template_id_inner,
+                                                        "prompt": prompt,
+                                                        "action": action,
+                                                    })) {
+                                                        eprintln!("Failed to emit execute-template event: {}", e);
+                                                    } else {
+                                                        println!("Successfully emitted execute-template event");
+                                                    }
+                                                } else {
+                                                    eprintln!("Popup window not found when trying to emit event");
+                                                }
+                                            });
+                                        }
+                                    },
+                                ) {
+                                    Ok(_) => {
+                                        if let Err(e) = app.global_shortcut().register(template_shortcut) {
+                                            eprintln!("Warning: Failed to register template shortcut {}: {}", hotkey_str, e);
+                                        }
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Warning: Failed to setup template shortcut handler {}: {}", hotkey_str, e);
+                                    }
+                                }
+                            } else {
+                                eprintln!("Warning: Failed to parse template hotkey: {}", hotkey_str);
+                            }
+                        }
                     }
                 }
             }
