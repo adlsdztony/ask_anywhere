@@ -312,8 +312,8 @@ export default function ConfigPage() {
                     Set a custom hotkey to trigger this template directly.
                     Examples: Alt+T, Ctrl+Shift+E, CommandOrControl+Q
                     <br />
-                    Note: You need to restart the app for hotkey changes to take
-                    effect.
+                    Hotkeys will be automatically registered when you save the
+                    configuration.
                   </p>
                 </div>
                 <div className="form-group">
@@ -364,8 +364,8 @@ export default function ConfigPage() {
               <p className="help-text">
                 Examples: CommandOrControl+Shift+Space, Alt+Q, Ctrl+Shift+A
                 <br />
-                Note: You need to restart the app for hotkey changes to take
-                effect.
+                Hotkeys will be automatically registered when you save the
+                configuration.
               </p>
             </div>
           </div>

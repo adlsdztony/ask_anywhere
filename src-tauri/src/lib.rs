@@ -55,6 +55,257 @@ async fn save_config(app: AppHandle, config: AppConfig) -> Result<(), String> {
 
     store.save().map_err(|e| e.to_string())?;
 
+    // Reload hotkeys after saving config
+    reload_hotkeys(app).await?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn reload_hotkeys(app: AppHandle) -> Result<(), String> {
+    #[cfg(desktop)]
+    {
+        use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+
+        // Load config
+        let config = load_config(app.clone()).await?;
+
+        // Unregister all existing shortcuts
+        let _ = app.global_shortcut().unregister_all();
+
+        // Re-register popup hotkey
+        let shortcut_str = config.hotkeys.popup_hotkey.as_str();
+        let shortcut: Shortcut = shortcut_str
+            .parse()
+            .map_err(|e| format!("Failed to parse shortcut: {:?}", e))?;
+
+        let app_handle = app.clone();
+        match app.global_shortcut().on_shortcut(
+            shortcut.clone(),
+            move |_app, _shortcut, event| {
+                if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                    let app = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        // Check if popup is already visible
+                        if let Some(popup) = app.get_webview_window("popup") {
+                            if let Ok(is_visible) = popup.is_visible() {
+                                if is_visible {
+                                    // Popup is already open, emit event to trigger replace
+                                    let _ = popup.emit("trigger-replace", ());
+                                    return;
+                                }
+                            }
+                        }
+
+                        // Popup not visible, proceed with normal flow
+                        // Capture the selected text using UI Automation API
+                        match clipboard::capture_selected_text().await {
+                            Ok(text) => {
+                                // Store the captured text in state
+                                let captured_state: tauri::State<CapturedText> = app.state();
+                                *captured_state.0.lock().await = text;
+                            }
+                            Err(e) => {
+                                eprintln!("Warning: Failed to capture selection: {}", e);
+                            }
+                        }
+
+                        // Show the popup window
+                        let _ = show_popup_window(app).await;
+                    });
+                }
+            },
+        ) {
+            Ok(_) => {
+                if let Err(e) = app.global_shortcut().register(shortcut) {
+                    eprintln!("Warning: Failed to register global shortcut: {}", e);
+                }
+            }
+            Err(e) => {
+                eprintln!("Warning: Failed to setup shortcut handler: {}", e);
+            }
+        }
+
+        // Re-register template hotkeys
+        for template in config.templates.iter() {
+            if let Some(hotkey_str) = &template.hotkey {
+                if !hotkey_str.is_empty() {
+                    let template_id = template.id.clone();
+                    let template_prompt = template.prompt.clone();
+                    let template_action = template.action.clone();
+                    let background_mode = template.background_mode;
+                    let app_clone = app.clone();
+
+                    if let Ok(template_shortcut) = hotkey_str.parse::<Shortcut>() {
+                        // Register template shortcut handler
+                        match app.global_shortcut().on_shortcut(
+                            template_shortcut.clone(),
+                            move |_app, _shortcut, event| {
+                                if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                                    let app = app_clone.clone();
+                                    let prompt = template_prompt.clone();
+                                    let action = template_action.clone();
+                                    let template_id_inner = template_id.clone();
+
+                                    tauri::async_runtime::spawn(async move {
+                                        // Capture the selected text
+                                        let captured_text = match clipboard::capture_selected_text().await {
+                                            Ok(text) => {
+                                                // Store the captured text in state
+                                                let captured_state: tauri::State<CapturedText> = app.state();
+                                                *captured_state.0.lock().await = text.clone();
+                                                text
+                                            }
+                                            Err(e) => {
+                                                eprintln!("Warning: Failed to capture selection: {}", e);
+                                                String::new()
+                                            }
+                                        };
+
+                                        if background_mode {
+                                            // Background mode: execute without showing popup
+                                            println!("Executing template {} in background mode", template_id_inner);
+
+                                            // Load config to get model info
+                                            let store = match app.store("config.json") {
+                                                Ok(s) => s,
+                                                Err(e) => {
+                                                    eprintln!("Failed to load config: {}", e);
+                                                    return;
+                                                }
+                                            };
+
+                                            let config: AppConfig = match store.get("app_config") {
+                                                Some(value) => match serde_json::from_value(value.clone()) {
+                                                    Ok(c) => c,
+                                                    Err(e) => {
+                                                        eprintln!("Failed to parse config: {}", e);
+                                                        return;
+                                                    }
+                                                },
+                                                None => {
+                                                    eprintln!("No config found");
+                                                    return;
+                                                }
+                                            };
+
+                                            let selected_model = &config.models[config.selected_model_index];
+
+                                            // Build the full prompt with captured text
+                                            let full_prompt = if !captured_text.is_empty() {
+                                                format!("{}\n\n{}", prompt, captured_text)
+                                            } else {
+                                                prompt.clone()
+                                            };
+
+                                            // Call AI API directly in background
+                                            let base_url = selected_model.base_url.clone();
+                                            let api_key = selected_model.api_key.clone();
+                                            let model_name = selected_model.model_name.clone();
+                                            let action_clone = action.clone();
+                                            let app_for_action = app.clone();
+
+                                            // Make API call
+                                            tokio::spawn(async move {
+                                                use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+
+                                                let url = if base_url.ends_with('/') {
+                                                    format!("{}chat/completions", base_url)
+                                                } else {
+                                                    format!("{}/chat/completions", base_url)
+                                                };
+
+                                                let mut headers = HeaderMap::new();
+                                                headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+                                                if let Ok(auth_value) = HeaderValue::from_str(&format!("Bearer {}", api_key)) {
+                                                    headers.insert(AUTHORIZATION, auth_value);
+                                                }
+
+                                                let body = serde_json::json!({
+                                                    "model": model_name,
+                                                    "messages": [{"role": "user", "content": full_prompt}],
+                                                    "stream": false
+                                                });
+
+                                                let client = reqwest::Client::new();
+                                                match client.post(&url).headers(headers).json(&body).send().await {
+                                                    Ok(response) => {
+                                                        if response.status().is_success() {
+                                                            if let Ok(result) = response.json::<serde_json::Value>().await {
+                                                                if let Some(content) = result["choices"][0]["message"]["content"].as_str() {
+                                                                    println!("Background execution completed. Response length: {}", content.len());
+
+                                                                    // Execute action
+                                                                    if action_clone == "copy" {
+                                                                        use tauri_plugin_clipboard_manager::ClipboardExt;
+                                                                        if let Err(e) = app_for_action.clipboard().write_text(content) {
+                                                                            eprintln!("Failed to copy to clipboard: {}", e);
+                                                                        } else {
+                                                                            println!("Copied response to clipboard");
+                                                                        }
+                                                                    } else if action_clone == "replace" {
+                                                                        // Use the replace_text_in_source function
+                                                                        replace_text_in_source(app_for_action, content.to_string());
+                                                                    }
+                                                                }
+                                                            }
+                                                        } else {
+                                                            eprintln!("API error: {}", response.status());
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        eprintln!("Request failed: {}", e);
+                                                    }
+                                                }
+                                            });
+                                        } else {
+                                            // Normal mode: show popup and emit event
+                                            // Show the popup window with template info
+                                            if let Err(e) = show_popup_window(app.clone()).await {
+                                                eprintln!("Failed to show popup: {}", e);
+                                                return;
+                                            }
+
+                                            // Wait a bit for the window to be fully loaded
+                                            tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+
+                                            // Emit event to trigger template execution
+                                            if let Some(popup) = app.get_webview_window("popup") {
+                                                println!("Emitting execute-template event for template: {}", template_id_inner);
+                                                if let Err(e) = popup.emit("execute-template", serde_json::json!({
+                                                    "id": template_id_inner,
+                                                    "prompt": prompt,
+                                                    "action": action,
+                                                })) {
+                                                    eprintln!("Failed to emit execute-template event: {}", e);
+                                                } else {
+                                                    println!("Successfully emitted execute-template event");
+                                                }
+                                            } else {
+                                                eprintln!("Popup window not found when trying to emit event");
+                                            }
+                                        }
+                                    });
+                                }
+                            },
+                        ) {
+                            Ok(_) => {
+                                if let Err(e) = app.global_shortcut().register(template_shortcut) {
+                                    eprintln!("Warning: Failed to register template shortcut {}: {}", hotkey_str, e);
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Warning: Failed to setup template shortcut handler {}: {}", hotkey_str, e);
+                            }
+                        }
+                    } else {
+                        eprintln!("Warning: Failed to parse template hotkey: {}", hotkey_str);
+                    }
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -876,6 +1127,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load_config,
             save_config,
+            reload_hotkeys,
             get_captured_text,
             show_popup_window,
             hide_popup_window,
