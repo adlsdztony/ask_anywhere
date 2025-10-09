@@ -49,6 +49,7 @@ body::-webkit-scrollbar {
     margin: 0px;
     overflow: hidden;
     min-height: 0;
+    margin-bottom: 10px;
 }
 
 .popup-content::-webkit-scrollbar {
@@ -297,7 +298,6 @@ body::-webkit-scrollbar {
     padding: 6px;
     max-height: 250px;
     overflow-y: auto;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
     animation: suggestionsSlideIn 0.2s ease;
     position: relative;
     z-index: 1500;

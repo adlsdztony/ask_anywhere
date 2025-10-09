@@ -23,7 +23,7 @@ export default function PopupWindow() {
 
   // Window size constants
   const COMPACT_WIDTH = 500;
-  const COMPACT_HEIGHT = 300;
+  const COMPACT_HEIGHT = 200;
   const EXPANDED_WIDTH = 500;
   const EXPANDED_HEIGHT = 600;
 
