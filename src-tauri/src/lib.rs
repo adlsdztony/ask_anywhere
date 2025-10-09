@@ -142,6 +142,7 @@ async fn show_popup_window(app: AppHandle) -> Result<(), String> {
         .always_on_top(true)
         .skip_taskbar(true)
         .transparent(true)
+        .shadow(false) // Remove window shadow
         .theme(None) // Follow system theme
         .visible(false) // Create hidden first
         .build()
