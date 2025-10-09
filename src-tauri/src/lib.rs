@@ -405,17 +405,7 @@ async fn is_popup_pinned(state: State<'_, PopupPinned>) -> Result<bool, String> 
 async fn replace_text_in_source(app: AppHandle, text: String) -> Result<(), String> {
     use tauri_plugin_clipboard_manager::ClipboardExt;
 
-    // Hide the popup window first to return focus to the original application
-    if let Some(popup) = app.get_webview_window("popup") {
-        popup
-            .hide()
-            .map_err(|e| format!("Failed to hide popup: {}", e))?;
-    }
-
-    // Wait for window to hide and focus to return
-    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
-
-    // Save current clipboard content
+    // Save current clipboard content first (before hiding window)
     let original_clipboard = app.clipboard().read_text().ok();
 
     // Write the new text to clipboard
@@ -425,6 +415,14 @@ async fn replace_text_in_source(app: AppHandle, text: String) -> Result<(), Stri
 
     // Small delay to ensure clipboard is updated
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Hide the popup window to return focus to the original application
+    if let Some(popup) = app.get_webview_window("popup") {
+        let _ = popup.hide(); // Ignore errors since window might be closing
+    }
+
+    // Wait for window to hide and focus to return
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
 
     // Simulate Ctrl+V to paste
     tokio::task::spawn_blocking(|| -> Result<(), String> {
@@ -450,7 +448,7 @@ async fn replace_text_in_source(app: AppHandle, text: String) -> Result<(), Stri
     // Wait a bit before restoring clipboard
     tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
 
-    // Optional: Restore original clipboard
+    // Restore original clipboard
     if let Some(original) = original_clipboard {
         let _ = app.clipboard().write_text(original);
     }
