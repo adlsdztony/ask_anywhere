@@ -357,10 +357,9 @@
     }
 
     .model-select select {
-        background: #1e1e1e;
+        background: #1e1e1e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e0e0e0' d='M6 9L1 4h10z'/%3E%3C/svg%3E") no-repeat right 10px center;
         border: 1px solid #404040;
         color: #e0e0e0;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e0e0e0' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
     }
 
     .model-select select:hover {
@@ -399,9 +398,14 @@
     }
 
     .form-group input,
-    .form-group textarea,
-    .form-group select {
+    .form-group textarea {
         background: #1e1e1e;
+        border: 1px solid #404040;
+        color: #e0e0e0;
+    }
+
+    .form-group select {
+        background: #1e1e1e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e0e0e0' d='M6 9L1 4h10z'/%3E%3C/svg%3E") no-repeat right 10px center;
         border: 1px solid #404040;
         color: #e0e0e0;
     }
@@ -412,10 +416,6 @@
 
     .form-group label.checkbox-label:hover {
         color: #4a9eff;
-    }
-
-    .form-group select {
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e0e0e0' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
     }
 
     .form-group select:hover {
