@@ -104,7 +104,7 @@ async fn stream_ai_response(
     base_url: String,
     api_key: String,
     model_name: String,
-    prompt: String,
+    messages: Vec<serde_json::Value>,
     channel: Channel<String>,
 ) -> Result<(), String> {
     use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
@@ -128,12 +128,7 @@ async fn stream_ai_response(
     // Build request body
     let body = json!({
         "model": model_name,
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
+        "messages": messages,
         "stream": true
     });
 

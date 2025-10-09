@@ -12,7 +12,10 @@ import {
   isPopupPinned,
   replaceTextInSource,
 } from "../api";
-import { streamAiResponse } from "../services/aiClient";
+import {
+  streamAiResponse,
+  type Message as AIMessage,
+} from "../services/aiClient";
 import type { AppConfig } from "../types";
 import "./PopupWindow.css";
 
@@ -57,22 +60,27 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
   );
 }
 
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export default function PopupWindow() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [selectedText, setSelectedText] = useState("");
   const [customPrompt, setCustomPrompt] = useState("");
-  const [response, setResponse] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [currentResponse, setCurrentResponse] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
-  const [copyButtonText, setCopyButtonText] = useState("Copy");
-  const [replaceButtonText, setReplaceButtonText] = useState("Replace");
   const [isPinned, setIsPinned] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Window size constants
   const COMPACT_WIDTH = 500;
@@ -85,26 +93,30 @@ export default function PopupWindow() {
 
     // Listen for trigger-replace event from backend
     const unlisten = listen("trigger-replace", () => {
-      if (response) {
-        // Trigger replace if we have a response
-        handleReplaceResponseInternal();
+      // Get the latest assistant message
+      const latestAssistantMessage = messages.find(
+        (m) => m.role === "assistant",
+      );
+      if (latestAssistantMessage) {
+        // Trigger replace with the latest assistant response
+        handleReplaceResponseInternal(latestAssistantMessage.content);
       }
     });
 
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [response]);
+  }, [messages]);
 
-  // Resize window when response state changes
+  // Resize window when messages change
   useEffect(() => {
     const handleResize = async () => {
       try {
-        if (response) {
-          // Expand window when response is available
+        if (messages.length > 0 || currentResponse) {
+          // Expand window when there are messages or streaming
           await resizePopupWindow(EXPANDED_WIDTH, EXPANDED_HEIGHT);
         } else {
-          // Compact window when no response
+          // Compact window when no messages
           await resizePopupWindow(COMPACT_WIDTH, COMPACT_HEIGHT);
         }
       } catch (err) {
@@ -113,7 +125,14 @@ export default function PopupWindow() {
     };
 
     handleResize();
-  }, [response]);
+  }, [messages.length, currentResponse]);
+
+  // Auto-scroll to top when new messages are added
+  useEffect(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = 0;
+    }
+  }, [messages.length]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -194,9 +213,13 @@ export default function PopupWindow() {
 
     // Determine the prompt to use
     let finalPrompt = "";
+    const isFirstMessage = messages.length === 0;
+
     if (promptOverride !== undefined) {
       // Use the provided prompt override (from suggestion click)
-      finalPrompt = `${promptOverride}\n\n${selectedText}`;
+      finalPrompt = isFirstMessage
+        ? `${promptOverride}\n\n${selectedText}`
+        : promptOverride;
     } else {
       // Check if input starts with "/" to use template
       const trimmedPrompt = customPrompt.trim();
@@ -210,13 +233,21 @@ export default function PopupWindow() {
           const additionalText = trimmedPrompt
             .slice(commandName.length + 1)
             .trim();
-          finalPrompt = `${template.prompt}\n\n${selectedText}${additionalText ? "\n\n" + additionalText : ""}`;
+          if (isFirstMessage) {
+            finalPrompt = `${template.prompt}\n\n${selectedText}${additionalText ? "\n\n" + additionalText : ""}`;
+          } else {
+            finalPrompt = additionalText
+              ? `${template.prompt}\n\n${additionalText}`
+              : template.prompt;
+          }
         } else {
           setError(`Template "${commandName}" not found.`);
           return;
         }
       } else if (trimmedPrompt) {
-        finalPrompt = `${trimmedPrompt}\n\n${selectedText}`;
+        finalPrompt = isFirstMessage
+          ? `${trimmedPrompt}\n\n${selectedText}`
+          : trimmedPrompt;
       } else {
         setError("Please enter a prompt or use a template command.");
         return;
@@ -224,25 +255,46 @@ export default function PopupWindow() {
     }
 
     setIsStreaming(true);
-    setResponse("");
+    setCurrentResponse("");
     setError(null);
     setShowSuggestions(false);
 
+    // Build conversation history
+    const conversationMessages: AIMessage[] = [
+      // Include all previous messages
+      ...messages,
+      // Add current user message
+      { role: "user", content: finalPrompt },
+    ];
+
+    // Add user message to UI immediately
+    setMessages((prev) => [{ role: "user", content: finalPrompt }, ...prev]);
+
     try {
+      let accumulatedResponse = "";
       await streamAiResponse(
         selectedModel.base_url,
         selectedModel.api_key,
         selectedModel.model_name,
-        finalPrompt,
+        conversationMessages,
         {
           onChunk: (chunk) => {
-            setResponse((prev) => prev + chunk);
+            accumulatedResponse += chunk;
+            setCurrentResponse(accumulatedResponse);
           },
           onError: (err) => {
             setError(err);
             setIsStreaming(false);
+            setCurrentResponse("");
           },
           onDone: () => {
+            // Add assistant response to messages
+            setMessages((prev) => [
+              { role: "assistant", content: accumulatedResponse },
+              ...prev,
+            ]);
+            setCurrentResponse("");
+            setCustomPrompt("");
             setIsStreaming(false);
           },
         },
@@ -251,6 +303,7 @@ export default function PopupWindow() {
       console.error("Stream error:", err);
       setError(err instanceof Error ? err.message : "Failed to get response");
       setIsStreaming(false);
+      setCurrentResponse("");
     }
   };
 
@@ -365,25 +418,25 @@ export default function PopupWindow() {
   const handleCopyResponse = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (response) {
+    const textToCopy =
+      currentResponse || messages.find((m) => m.role === "assistant")?.content;
+    if (textToCopy) {
       try {
-        await navigator.clipboard.writeText(response);
-        setCopyButtonText("Copied!");
-        setTimeout(() => {
-          setCopyButtonText("Copy");
-        }, 1500);
+        await navigator.clipboard.writeText(textToCopy);
       } catch (err) {
         console.error("Failed to copy:", err);
       }
     }
   };
 
-  const handleReplaceResponseInternal = () => {
-    if (response) {
-      setReplaceButtonText("Replacing...");
-
+  const handleReplaceResponseInternal = (text?: string) => {
+    const textToReplace =
+      text ||
+      currentResponse ||
+      messages.find((m) => m.role === "assistant")?.content;
+    if (textToReplace) {
       // Fire and forget - don't wait for response since window will close
-      replaceTextInSource(response).catch((err) => {
+      replaceTextInSource(textToReplace).catch((err) => {
         console.error("Failed to replace:", err);
       });
 
@@ -565,31 +618,158 @@ export default function PopupWindow() {
 
         {error && <div className="error-message">{error}</div>}
 
-        {response && (
-          <div className="response-section">
-            <div className="response-text markdown-content">
-              <div className="action-buttons">
-                <button
-                  className="replace-button"
-                  onClick={handleReplaceResponse}
-                >
-                  {replaceButtonText}
-                </button>
-                <button className="copy-button" onClick={handleCopyResponse}>
-                  {copyButtonText}
-                </button>
+        {(messages.length > 0 || currentResponse) && (
+          <div className="messages-container" ref={messagesContainerRef}>
+            {/* Current streaming response (AI message at top) */}
+            {currentResponse && (
+              <div className="message assistant-message">
+                <div className="message-content markdown-content">
+                  <div className="action-buttons">
+                    <button
+                      className="replace-button"
+                      onClick={handleReplaceResponse}
+                    >
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="1 4 1 10 7 10" />
+                        <polyline points="23 20 23 14 17 14" />
+                        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
+                      </svg>
+                    </button>
+                    <button
+                      className="copy-button"
+                      onClick={handleCopyResponse}
+                    >
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect
+                          x="9"
+                          y="9"
+                          width="13"
+                          height="13"
+                          rx="2"
+                          ry="2"
+                        />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                      </svg>
+                    </button>
+                  </div>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      pre: ({ children }) => {
+                        return <CodeBlock>{children}</CodeBlock>;
+                      },
+                    }}
+                  >
+                    {currentResponse}
+                  </ReactMarkdown>
+                </div>
               </div>
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  pre: ({ children }) => {
-                    return <CodeBlock>{children}</CodeBlock>;
-                  },
-                }}
+            )}
+
+            {/* Message history (newest first) */}
+            {messages.map((message, index) => (
+              <div
+                key={index}
+                className={`message ${message.role === "user" ? "user-message" : "assistant-message"}`}
               >
-                {response}
-              </ReactMarkdown>
-            </div>
+                <div className="message-content">
+                  {message.role === "assistant" ? (
+                    <>
+                      <div className="action-buttons">
+                        <button
+                          className="replace-button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleReplaceResponseInternal(message.content);
+                          }}
+                        >
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <polyline points="1 4 1 10 7 10" />
+                            <polyline points="23 20 23 14 17 14" />
+                            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
+                          </svg>
+                        </button>
+                        <button
+                          className="copy-button"
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            try {
+                              await navigator.clipboard.writeText(
+                                message.content,
+                              );
+                            } catch (err) {
+                              console.error("Failed to copy:", err);
+                            }
+                          }}
+                        >
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <rect
+                              x="9"
+                              y="9"
+                              width="13"
+                              height="13"
+                              rx="2"
+                              ry="2"
+                            />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                          </svg>
+                        </button>
+                      </div>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          pre: ({ children }) => {
+                            return <CodeBlock>{children}</CodeBlock>;
+                          },
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </>
+                  ) : (
+                    <div className="user-message-text">{message.content}</div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

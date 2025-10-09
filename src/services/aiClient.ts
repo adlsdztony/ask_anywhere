@@ -6,11 +6,16 @@ export interface StreamCallbacks {
   onDone: () => void;
 }
 
+export interface Message {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
 export async function streamAiResponse(
   baseUrl: string,
   apiKey: string,
   modelName: string,
-  prompt: string,
+  messages: Message[],
   callbacks: StreamCallbacks,
 ): Promise<void> {
   const { onChunk, onError, onDone } = callbacks;
@@ -29,7 +34,7 @@ export async function streamAiResponse(
       baseUrl,
       apiKey,
       modelName,
-      prompt,
+      messages,
       channel,
     });
 
