@@ -525,6 +525,49 @@ body::-webkit-scrollbar {
     width: 100%;
     margin: 12px 0;
     font-size: 13px;
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+.markdown-content table::-webkit-scrollbar {
+    height: 6px;
+}
+
+.markdown-content table::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 3px;
+}
+
+.markdown-content table::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.markdown-content table::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+    .markdown-content table::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .markdown-content table::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .markdown-content table::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+}
+
+.markdown-content table thead,
+.markdown-content table tbody,
+.markdown-content table tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
 }
 
 .markdown-content table th,
