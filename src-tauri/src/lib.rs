@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tauri::ipc::Channel;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, State, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use tauri_plugin_store::StoreExt;
 use tokio::sync::Mutex;
 
@@ -640,6 +640,18 @@ pub fn run() {
                         if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                             let app = app_handle.clone();
                             tauri::async_runtime::spawn(async move {
+                                // Check if popup is already visible
+                                if let Some(popup) = app.get_webview_window("popup") {
+                                    if let Ok(is_visible) = popup.is_visible() {
+                                        if is_visible {
+                                            // Popup is already open, emit event to trigger replace
+                                            let _ = popup.emit("trigger-replace", ());
+                                            return;
+                                        }
+                                    }
+                                }
+
+                                // Popup not visible, proceed with normal flow
                                 // Capture the selected text using UI Automation API
                                 match clipboard::capture_selected_text().await {
                                     Ok(text) => {

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import {
   loadConfig,
   getCapturedText,
@@ -40,7 +41,19 @@ export default function PopupWindow() {
 
   useEffect(() => {
     initializePopup();
-  }, []);
+
+    // Listen for trigger-replace event from backend
+    const unlisten = listen("trigger-replace", () => {
+      if (response) {
+        // Trigger replace if we have a response
+        handleReplaceResponseInternal();
+      }
+    });
+
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [response]);
 
   // Resize window when response state changes
   useEffect(() => {
@@ -324,9 +337,7 @@ export default function PopupWindow() {
     }
   };
 
-  const handleReplaceResponse = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleReplaceResponseInternal = () => {
     if (response) {
       setReplaceButtonText("Replacing...");
 
@@ -340,6 +351,12 @@ export default function PopupWindow() {
         hidePopupWindow().catch(console.error);
       }, 50);
     }
+  };
+
+  const handleReplaceResponse = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleReplaceResponseInternal();
   };
 
   const handlePinClick = async (e: React.MouseEvent) => {
