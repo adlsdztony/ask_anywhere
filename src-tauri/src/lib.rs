@@ -3,7 +3,9 @@ mod config;
 
 use auto_launch::AutoLaunch;
 use config::AppConfig;
+use futures::StreamExt;
 use std::sync::Arc;
+use tauri::ipc::Channel;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, State, WindowEvent};
@@ -87,6 +89,112 @@ async fn toggle_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
     let mut config = load_config(app.clone()).await?;
     config.autostart = enabled;
     save_config(app, config).await?;
+
+    Ok(())
+}
+
+// Streaming AI response command
+#[tauri::command]
+async fn stream_ai_response(
+    base_url: String,
+    api_key: String,
+    model_name: String,
+    prompt: String,
+    channel: Channel<String>,
+) -> Result<(), String> {
+    use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+    use serde_json::json;
+
+    // Build the full URL
+    let url = if base_url.ends_with('/') {
+        format!("{}chat/completions", base_url)
+    } else {
+        format!("{}/chat/completions", base_url)
+    };
+
+    // Build headers
+    let mut headers = HeaderMap::new();
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("Bearer {}", api_key)).map_err(|e| e.to_string())?,
+    );
+
+    // Build request body
+    let body = json!({
+        "model": model_name,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "stream": true
+    });
+
+    // Create client
+    let client = reqwest::Client::new();
+
+    // Send request
+    let response = client
+        .post(&url)
+        .headers(headers)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    // Check status
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!("API error ({}): {}", status, error_text));
+    }
+
+    // Stream the response
+    let mut stream = response.bytes_stream();
+
+    let mut buffer = String::new();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("Stream error: {}", e))?;
+        let chunk_str = String::from_utf8_lossy(&chunk);
+
+        buffer.push_str(&chunk_str);
+
+        // Process SSE format (data: {...}\n\n)
+        while let Some(data_start) = buffer.find("data: ") {
+            let data_content_start = data_start + 6;
+
+            if let Some(line_end_pos) = buffer[data_content_start..].find('\n') {
+                let json_str = buffer[data_content_start..data_content_start + line_end_pos]
+                    .trim()
+                    .to_string();
+                let remaining = buffer[data_content_start + line_end_pos + 1..].to_string();
+                buffer = remaining;
+
+                // Check for [DONE] marker
+                if json_str == "[DONE]" {
+                    channel.send("".to_string()).map_err(|e| e.to_string())?;
+                    break;
+                }
+
+                // Parse and extract content
+                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                    if let Some(content) = parsed["choices"][0]["delta"]["content"].as_str() {
+                        channel
+                            .send(content.to_string())
+                            .map_err(|e| e.to_string())?;
+                    }
+                }
+            } else {
+                // Not enough data yet, keep in buffer
+                break;
+            }
+        }
+    }
 
     Ok(())
 }
@@ -485,6 +593,7 @@ pub fn run() {
             hide_popup_window,
             resize_popup_window,
             toggle_autostart,
+            stream_ai_response,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

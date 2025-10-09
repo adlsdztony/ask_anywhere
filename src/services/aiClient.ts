@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { invoke, Channel } from "@tauri-apps/api/core";
 
 export interface StreamCallbacks {
   onChunk: (content: string) => void;
@@ -11,42 +11,33 @@ export async function streamAiResponse(
   apiKey: string,
   modelName: string,
   prompt: string,
-  callbacks: StreamCallbacks
+  callbacks: StreamCallbacks,
 ): Promise<void> {
   const { onChunk, onError, onDone } = callbacks;
 
   try {
-    // Create OpenAI client with custom base URL
-    const client = new OpenAI({
-      apiKey,
-      baseURL: baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl,
-      dangerouslyAllowBrowser: true, // Required for browser usage
-    });
-
-    // Create streaming chat completion
-    const stream = await client.chat.completions.create({
-      model: modelName,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      stream: true,
-    });
-
-    // Process the stream
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) {
-        onChunk(content);
+    // Create a channel to receive streaming chunks from Rust
+    const channel = new Channel<string>();
+    channel.onmessage = (chunk: string) => {
+      if (chunk) {
+        onChunk(chunk);
       }
-    }
+    };
+
+    // Invoke the Rust command with the channel
+    await invoke("stream_ai_response", {
+      baseUrl,
+      apiKey,
+      modelName,
+      prompt,
+      channel,
+    });
 
     // Stream completed successfully
     onDone();
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
     onError(errorMessage);
   }
 }
