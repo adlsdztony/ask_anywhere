@@ -235,13 +235,10 @@ export default function PopupWindow() {
 
         {response && (
           <div className="response-section">
-            <div className="response-header">
-              <label>Response:</label>
+            <div className="response-text markdown-content">
               <button className="copy-button" onClick={handleCopyResponse}>
                 Copy
               </button>
-            </div>
-            <div className="response-text markdown-content">
               <ReactMarkdown>{response}</ReactMarkdown>
             </div>
           </div>
