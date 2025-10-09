@@ -393,6 +393,7 @@ body::-webkit-scrollbar {
 
 /* Response section */
 .response-section {
+    position: relative;
     display: flex;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(35px);
@@ -422,7 +423,7 @@ body::-webkit-scrollbar {
     color: #555;
     cursor: pointer;
     transition: all 0.2s ease;
-    z-index: 10;
+    z-index: 100;
 }
 
 .copy-button:hover {
@@ -444,7 +445,6 @@ body::-webkit-scrollbar {
 }
 
 .response-text {
-    position: relative;
     flex: 1;
     padding: 16px;
     padding-top: 20px;

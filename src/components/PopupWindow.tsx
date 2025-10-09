@@ -16,6 +16,7 @@ export default function PopupWindow() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
+  const [copyButtonText, setCopyButtonText] = useState("Copy");
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -247,11 +248,16 @@ export default function PopupWindow() {
     }
   };
 
-  const handleCopyResponse = async () => {
+  const handleCopyResponse = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (response) {
       try {
         await navigator.clipboard.writeText(response);
-        alert("Response copied to clipboard!");
+        setCopyButtonText("Copied!");
+        setTimeout(() => {
+          setCopyButtonText("Copy");
+        }, 1500);
       } catch (err) {
         console.error("Failed to copy:", err);
       }
@@ -343,7 +349,7 @@ export default function PopupWindow() {
           <div className="response-section">
             <div className="response-text markdown-content">
               <button className="copy-button" onClick={handleCopyResponse}>
-                Copy
+                {copyButtonText}
               </button>
               <ReactMarkdown>{response}</ReactMarkdown>
             </div>
