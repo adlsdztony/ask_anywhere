@@ -57,7 +57,7 @@ impl Default for AppConfig {
                 },
             ],
             hotkeys: HotkeyConfig {
-                popup_hotkey: "CommandOrControl+Alt+P".to_string(),
+                popup_hotkey: "Alt+S".to_string(),
             },
             selected_model_index: 0,
             autostart: false,
@@ -71,7 +71,7 @@ impl Default for ModelConfig {
             name: "New Model".to_string(),
             base_url: "https://api.openai.com/v1".to_string(),
             api_key: String::new(),
-            model_name: "gpt-3.5-turbo".to_string(),
+            model_name: "gpt-4.1".to_string(),
         }
     }
 }
