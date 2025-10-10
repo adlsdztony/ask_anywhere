@@ -56,3 +56,21 @@ export async function clearScreenshots(): Promise<void> {
 export async function removeScreenshot(index: number): Promise<void> {
   await invoke("remove_screenshot", { index });
 }
+
+export async function captureScreenshotRegion(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): Promise<string> {
+  return await invoke<string>("capture_screenshot_region", {
+    x,
+    y,
+    width,
+    height,
+  });
+}
+
+export async function showScreenshotSelector(): Promise<void> {
+  await invoke("show_screenshot_selector");
+}

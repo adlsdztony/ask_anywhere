@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Screenshot Selector</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        overflow: hidden;
+        cursor: crosshair;
+        user-select: none;
+      }
+
+      #canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      .selection-box {
+        position: fixed;
+        border: 2px solid #4a9eff;
+        background: rgba(74, 158, 255, 0.1);
+        pointer-events: none;
+        display: none;
+      }
+
+      .selection-info {
+        position: fixed;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+        pointer-events: none;
+        display: none;
+      }
+
+      .hint {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 20px 40px;
+        border-radius: 8px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 16px;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <div class="selection-box" id="selection-box"></div>
+    <div class="selection-info" id="selection-info">0 x 0</div>
+    <div class="hint" id="hint">拖动鼠标选择截图区域 • ESC 取消</div>
+
+    <script type="module" src="/src/screenshot-selector.ts"></script>
+  </body>
+</html>

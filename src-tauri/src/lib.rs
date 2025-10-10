@@ -90,19 +90,14 @@ async fn reload_hotkeys(app: AppHandle) -> Result<(), String> {
                 if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                     let app = app_for_screenshot.clone();
                     tauri::async_runtime::spawn(async move {
-                        let screenshot_state: tauri::State<Screenshots> = app.state();
-                        match screenshot::capture_screenshot().await {
-                            Ok(screenshot_data) => {
-                                {
-                                    let mut screenshots = screenshot_state.0.lock().await;
-                                    screenshots.push(screenshot_data);
-                                    println!("Screenshot captured successfully");
-                                }
-                                let _ = show_popup_window(app).await;
-                            }
-                            Err(e) => {
-                                eprintln!("Failed to capture screenshot: {}", e);
-                            }
+                        // Clear captured text when screenshot hotkey is triggered
+                        let captured_state: tauri::State<CapturedText> = app.state();
+                        *captured_state.0.lock().await = String::new();
+
+                        // Show screenshot selector window
+                        match show_screenshot_selector(app).await {
+                            Ok(_) => println!("Screenshot selector opened"),
+                            Err(e) => eprintln!("Failed to open screenshot selector: {}", e),
                         }
                     });
                 }
@@ -375,6 +370,24 @@ async fn take_screenshot(state: State<'_, Screenshots>) -> Result<String, String
 }
 
 #[tauri::command]
+async fn capture_screenshot_region(
+    state: State<'_, Screenshots>,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<String, String> {
+    // Capture region
+    let screenshot_data = screenshot::capture_region(x, y, width, height).await?;
+
+    // Store in state
+    let mut screenshots = state.0.lock().await;
+    screenshots.push(screenshot_data.clone());
+
+    Ok(screenshot_data)
+}
+
+#[tauri::command]
 async fn get_screenshots(state: State<'_, Screenshots>) -> Result<Vec<String>, String> {
     let screenshots = state.0.lock().await;
     Ok(screenshots.clone())
@@ -396,6 +409,49 @@ async fn remove_screenshot(state: State<'_, Screenshots>, index: usize) -> Resul
     } else {
         Err("Screenshot index out of bounds".to_string())
     }
+}
+
+#[tauri::command]
+async fn show_screenshot_selector(app: AppHandle) -> Result<(), String> {
+    // Check if selector window already exists
+    if let Some(window) = app.get_webview_window("screenshot-selector") {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    // Get primary monitor information
+    let monitors = app.available_monitors().map_err(|e| e.to_string())?;
+    let monitor = monitors
+        .into_iter()
+        .next()
+        .ok_or_else(|| "No monitors found".to_string())?;
+
+    let monitor_size = monitor.size();
+    let monitor_position = monitor.position();
+
+    // Create full-screen transparent overlay window
+    let selector = tauri::WebviewWindowBuilder::new(
+        &app,
+        "screenshot-selector",
+        tauri::WebviewUrl::App("screenshot-selector.html".into()),
+    )
+    .title("Select Screenshot Region")
+    .inner_size(monitor_size.width as f64, monitor_size.height as f64)
+    .position(monitor_position.x as f64, monitor_position.y as f64)
+    .resizable(false)
+    .decorations(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .transparent(true)
+    .visible(true)
+    .fullscreen(true)
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    selector.set_focus().map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 // Helper function to create AutoLaunch instance
@@ -1072,22 +1128,14 @@ pub fn run() {
                         if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                             let app = app_for_screenshot.clone();
                             tauri::async_runtime::spawn(async move {
-                                // Take screenshot and store it
-                                let screenshot_state: tauri::State<Screenshots> = app.state();
-                                match screenshot::capture_screenshot().await {
-                                    Ok(screenshot_data) => {
-                                        {
-                                            let mut screenshots = screenshot_state.0.lock().await;
-                                            screenshots.push(screenshot_data);
-                                            println!("Screenshot captured successfully");
-                                        } // Drop the mutex guard here
+                                // Clear captured text when screenshot hotkey is triggered
+                                let captured_state: tauri::State<CapturedText> = app.state();
+                                *captured_state.0.lock().await = String::new();
 
-                                        // Show the popup window
-                                        let _ = show_popup_window(app).await;
-                                    }
-                                    Err(e) => {
-                                        eprintln!("Failed to capture screenshot: {}", e);
-                                    }
+                                // Show screenshot selector window
+                                match show_screenshot_selector(app).await {
+                                    Ok(_) => println!("Screenshot selector opened"),
+                                    Err(e) => eprintln!("Failed to open screenshot selector: {}", e),
                                 }
                             });
                         }
@@ -1309,9 +1357,11 @@ pub fn run() {
             is_popup_pinned,
             replace_text_in_source,
             take_screenshot,
+            capture_screenshot_region,
             get_screenshots,
             clear_screenshots,
             remove_screenshot,
+            show_screenshot_selector,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
