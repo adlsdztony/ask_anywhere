@@ -88,7 +88,6 @@ interface Message {
 
 export default function PopupWindow() {
   const [config, setConfig] = useState<AppConfig | null>(null);
-  const [selectedText, setSelectedText] = useState("");
   const [customPrompt, setCustomPrompt] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentResponse, setCurrentResponse] = useState("");
@@ -109,9 +108,13 @@ export default function PopupWindow() {
   const COMPACT_HEIGHT = 200;
   const EXPANDED_HEIGHT = 600;
 
+  // Initialize popup only once when component mounts
   useEffect(() => {
     initializePopup();
+  }, []);
 
+  // Separate effect for trigger-replace event listener
+  useEffect(() => {
     // Listen for trigger-replace event from backend
     const unlistenReplace = listen("trigger-replace", () => {
       // Get the latest assistant message
@@ -132,7 +135,9 @@ export default function PopupWindow() {
   // Separate effect for execute-template event - only set up when config is loaded
   useEffect(() => {
     if (!config) {
-      console.log("Config not loaded yet, skipping execute-template listener setup");
+      console.log(
+        "Config not loaded yet, skipping execute-template listener setup",
+      );
       return;
     }
 
@@ -153,12 +158,24 @@ export default function PopupWindow() {
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Get the captured text and update both state and ref
+      let capturedText = "";
       try {
-        const capturedText = await getCapturedText();
+        capturedText = await getCapturedText();
         console.log("Captured text:", capturedText);
         if (capturedText) {
-          setSelectedText(capturedText);
           capturedTextRef.current = capturedText; // Store in ref immediately
+
+          // Add captured text as a user message in history for display
+          setMessages((prev) => {
+            // Only add if messages is empty or doesn't already contain the captured text
+            if (
+              prev.length === 0 ||
+              prev[prev.length - 1].content !== capturedText
+            ) {
+              return [{ role: "user", content: capturedText }];
+            }
+            return prev;
+          });
         }
       } catch (err) {
         console.error("Failed to get captured text:", err);
@@ -167,12 +184,15 @@ export default function PopupWindow() {
       console.log("Preparing to call handleSend");
       console.log("- Template prompt:", prompt);
       console.log("- Action:", action);
-      console.log("- Captured text from ref:", capturedTextRef.current);
+      console.log("- Captured text:", capturedText);
 
-      // Call handleSend with just the template prompt
-      // handleSend will automatically combine it with selectedText for first message
+      // Call handleSend with captured text as parameter (bypasses state dependency)
       try {
-        await handleSend(prompt, action as "none" | "copy" | "replace");
+        await handleSend(
+          prompt,
+          action as "none" | "copy" | "replace",
+          capturedText,
+        );
         console.log("handleSend completed successfully");
       } catch (err) {
         console.error("Error calling handleSend:", err);
@@ -262,8 +282,10 @@ export default function PopupWindow() {
       // Get captured text from state (already captured by hotkey handler)
       const capturedText = await getCapturedText();
       if (capturedText) {
-        setSelectedText(capturedText);
         capturedTextRef.current = capturedText; // Store in ref for immediate access
+
+        // Add captured text as a user message in history (but don't send to LLM)
+        setMessages([{ role: "user", content: capturedText }]);
       }
 
       // Load pinned state
@@ -283,6 +305,7 @@ export default function PopupWindow() {
   const handleSend = async (
     promptOverride?: string,
     templateAction?: "none" | "copy" | "replace",
+    capturedTextOverride?: string,
   ) => {
     if (!config) return;
 
@@ -295,15 +318,10 @@ export default function PopupWindow() {
     // Determine the prompt to use and track template action
     let finalPrompt = "";
     let actionToExecute: "none" | "copy" | "replace" = "none";
-    const isFirstMessage = messages.length === 0;
 
     if (promptOverride !== undefined) {
       // Use the provided prompt override (from suggestion click or template hotkey)
-      // Use capturedTextRef as fallback if selectedText state hasn't updated yet
-      const textToUse = selectedText || capturedTextRef.current;
-      finalPrompt = isFirstMessage
-        ? `${promptOverride}\n\n${textToUse}`
-        : promptOverride;
+      finalPrompt = promptOverride;
       actionToExecute = templateAction || "none";
     } else {
       // Check if input starts with "/" to use template
@@ -318,22 +336,16 @@ export default function PopupWindow() {
           const additionalText = trimmedPrompt
             .slice(commandName.length + 1)
             .trim();
-          if (isFirstMessage) {
-            finalPrompt = `${template.prompt}\n\n${selectedText}${additionalText ? "\n\n" + additionalText : ""}`;
-          } else {
-            finalPrompt = additionalText
-              ? `${template.prompt}\n\n${additionalText}`
-              : template.prompt;
-          }
+          finalPrompt = additionalText
+            ? `${template.prompt}\n\n${additionalText}`
+            : template.prompt;
           actionToExecute = template.action;
         } else {
           setError(`Template "${commandName}" not found.`);
           return;
         }
       } else if (trimmedPrompt) {
-        finalPrompt = isFirstMessage
-          ? `${trimmedPrompt}\n\n${selectedText}`
-          : trimmedPrompt;
+        finalPrompt = trimmedPrompt;
       } else {
         setError("Please enter a prompt or use a template command.");
         return;
@@ -346,12 +358,32 @@ export default function PopupWindow() {
     setShowSuggestions(false);
 
     // Build conversation history
-    const conversationMessages: AIMessage[] = [
-      // Include all previous messages
-      ...messages,
-      // Add current user message
-      { role: "user", content: finalPrompt },
-    ];
+    // Reverse messages array since UI displays newest first, but API needs oldest first
+    const conversationMessages: AIMessage[] = [];
+
+    // If capturedTextOverride is provided, add it as the first message
+    if (capturedTextOverride) {
+      conversationMessages.push({
+        role: "user",
+        content: capturedTextOverride,
+      });
+    } else {
+      // Otherwise include all previous messages in correct order (oldest first)
+      conversationMessages.push(...messages.slice().reverse());
+    }
+
+    // Add current user message
+    conversationMessages.push({ role: "user", content: finalPrompt });
+
+    // Debug log
+    console.log("=== Sending to AI ===");
+    console.log("Current messages state:", messages);
+    console.log("Captured text override:", capturedTextOverride);
+    console.log(
+      "Conversation messages (will send to AI):",
+      conversationMessages,
+    );
+    console.log("=====================");
 
     // Add user message to UI immediately
     setMessages((prev) => [{ role: "user", content: finalPrompt }, ...prev]);
