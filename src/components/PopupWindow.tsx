@@ -109,10 +109,10 @@ export default function PopupWindow() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const capturedTextRef = useRef<string>("");
 
-  // Window size - use configured width or default to 500
+  // Window size - use configured values or defaults
   const POPUP_WIDTH = config?.popup_width || 500;
   const COMPACT_HEIGHT = 200;
-  const EXPANDED_HEIGHT = 600;
+  const EXPANDED_HEIGHT = config?.max_popup_height || 600;
 
   // Initialize popup only once when component mounts
   useEffect(() => {

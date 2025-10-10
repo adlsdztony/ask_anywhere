@@ -437,6 +437,26 @@ export default function ConfigPage() {
                 500px
               </p>
             </div>
+
+            <div className="form-group">
+              <label>Max Popup Height (px):</label>
+              <input
+                type="number"
+                min="300"
+                max="1200"
+                value={config.max_popup_height}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    max_popup_height: Number(e.target.value),
+                  })
+                }
+              />
+              <p className="help-text">
+                Set the maximum height of the popup window when expanded
+                (300-1200px). Default: 600px
+              </p>
+            </div>
           </div>
         )}
       </div>

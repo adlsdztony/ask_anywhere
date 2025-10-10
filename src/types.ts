@@ -4,6 +4,7 @@ export interface AppConfig {
   hotkeys: HotkeyConfig;
   selected_model_index: number;
   popup_width: number;
+  max_popup_height: number;
 }
 
 export interface ModelConfig {

@@ -10,10 +10,16 @@ pub struct AppConfig {
     pub autostart: bool,
     #[serde(default = "default_popup_width")]
     pub popup_width: f64,
+    #[serde(default = "default_max_popup_height")]
+    pub max_popup_height: f64,
 }
 
 fn default_popup_width() -> f64 {
     500.0
+}
+
+fn default_max_popup_height() -> f64 {
+    600.0
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -97,6 +103,7 @@ impl Default for AppConfig {
             selected_model_index: 0,
             autostart: false,
             popup_width: 500.0,
+            max_popup_height: 600.0,
         }
     }
 }
