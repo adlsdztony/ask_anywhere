@@ -15,7 +15,6 @@ import {
   isPopupPinned,
   replaceTextInSource,
   getScreenshots,
-  takeScreenshot,
   clearScreenshots,
   removeScreenshot,
 } from "../api";
@@ -693,16 +692,6 @@ export default function PopupWindow() {
     }
   };
 
-  const handleTakeScreenshot = async () => {
-    try {
-      const screenshot = await takeScreenshot();
-      setScreenshots((prev) => [...prev, screenshot]);
-    } catch (err) {
-      console.error("Failed to take screenshot:", err);
-      setError("Failed to take screenshot");
-    }
-  };
-
   const handleRemoveScreenshot = async (index: number) => {
     try {
       await removeScreenshot(index);
@@ -881,27 +870,6 @@ export default function PopupWindow() {
                   <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
                 </>
               )}
-            </svg>
-          </button>
-          <button
-            className="camera-button"
-            onClick={handleTakeScreenshot}
-            disabled={isStreaming}
-            type="button"
-            title="Take screenshot"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-              <circle cx="12" cy="13" r="4" />
             </svg>
           </button>
         </div>
