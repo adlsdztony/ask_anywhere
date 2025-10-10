@@ -459,11 +459,26 @@ fn create_auto_launch() -> Result<AutoLaunch, String> {
     let app_name = "AskAnywhere";
     let app_path = std::env::current_exe().map_err(|e| e.to_string())?;
 
-    Ok(AutoLaunch::new(
-        app_name,
-        &app_path.to_string_lossy(),
-        &[] as &[&str],
-    ))
+    #[cfg(target_os = "macos")]
+    {
+        // macOS requires 4 parameters: app_name, app_path, use_launch_agent, args
+        Ok(AutoLaunch::new(
+            app_name,
+            &app_path.to_string_lossy(),
+            false, // use_launch_agent: false = use AppleScript method
+            &[] as &[&str],
+        ))
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Windows and Linux use 3 parameters
+        Ok(AutoLaunch::new(
+            app_name,
+            &app_path.to_string_lossy(),
+            &[] as &[&str],
+        ))
+    }
 }
 
 #[tauri::command]
