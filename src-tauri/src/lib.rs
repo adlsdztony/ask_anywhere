@@ -80,9 +80,9 @@ async fn reload_hotkeys(app: AppHandle) -> Result<(), String> {
             .map_err(|e| format!("Failed to parse shortcut: {:?}", e))?;
 
         let app_handle = app.clone();
-        match app.global_shortcut().on_shortcut(
-            shortcut.clone(),
-            move |_app, _shortcut, event| {
+        match app
+            .global_shortcut()
+            .on_shortcut(shortcut.clone(), move |_app, _shortcut, event| {
                 if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
                     let app = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
@@ -114,8 +114,7 @@ async fn reload_hotkeys(app: AppHandle) -> Result<(), String> {
                         let _ = show_popup_window(app).await;
                     });
                 }
-            },
-        ) {
+            }) {
             Ok(_) => {
                 if let Err(e) = app.global_shortcut().register(shortcut) {
                     eprintln!("Warning: Failed to register global shortcut: {}", e);
@@ -799,15 +798,24 @@ pub fn run() {
             };
 
             // Setup system tray with autostart checkbox
+            let settings = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
             let autostart_item = CheckMenuItem::with_id(app, "autostart", "Autostart", true, config.autostart, None::<&str>)?;
             let restart = MenuItem::with_id(app, "restart", "Restart", true, None::<&str>)?;
             let exit = MenuItem::with_id(app, "exit", "Exit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&autostart_item, &restart, &exit])?;
+            let menu = Menu::with_items(app, &[&settings, &autostart_item, &restart, &exit])?;
 
             let _tray = TrayIconBuilder::with_id("tray")
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
+                    "settings" => {
+                        // Show the main settings window
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.unminimize();
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
                     "autostart" => {
                         // Toggle autostart in a new task
                         let app_clone = app.clone();
