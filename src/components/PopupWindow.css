@@ -23,8 +23,9 @@ body::-webkit-scrollbar {
     overflow: hidden;
 }
 
-/* Pin button */
-.pin-button {
+/* Pin button and Camera button shared styles */
+.pin-button,
+.camera-button {
     flex-shrink: 0;
     width: 30px;
     height: 30px;
@@ -41,12 +42,19 @@ body::-webkit-scrollbar {
     color: rgba(100, 100, 100, 0.6);
 }
 
-.pin-button:hover {
+.camera-button {
+    margin-right: 0;
+    margin-left: 6px;
+}
+
+.pin-button:hover,
+.camera-button:hover {
     background: rgba(0, 0, 0, 0.05);
     color: rgba(100, 100, 100, 0.9);
 }
 
-.pin-button:active {
+.pin-button:active,
+.camera-button:active {
     transform: scale(0.95);
     background: rgba(0, 0, 0, 0.08);
 }
@@ -310,6 +318,9 @@ body::-webkit-scrollbar {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .dropdown-item:hover {
@@ -319,6 +330,23 @@ body::-webkit-scrollbar {
 .dropdown-item.active {
     background: rgba(100, 150, 255, 0.25);
     color: #333;
+}
+
+.dropdown-item.disabled {
+    color: #999;
+    cursor: not-allowed;
+    font-style: italic;
+}
+
+.dropdown-item.disabled:hover {
+    background: transparent;
+}
+
+.vision-badge {
+    font-size: 14px;
+    margin-left: 8px;
+    opacity: 0.7;
+    flex-shrink: 0;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -349,6 +377,10 @@ body::-webkit-scrollbar {
     .dropdown-item.active {
         background: rgba(100, 150, 255, 0.35);
         color: #e0e0e0;
+    }
+
+    .dropdown-item.disabled {
+        color: #666;
     }
 }
 
@@ -431,6 +463,39 @@ body::-webkit-scrollbar {
 
     .suggestion-desc {
         color: #b0b0b0;
+    }
+}
+
+/* Message images */
+.message-images {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.message-image {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    max-height: 200px;
+    object-fit: cover;
+}
+
+.message-image:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+@media (prefers-color-scheme: dark) {
+    .message-image {
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .message-image:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
 }
 
@@ -945,5 +1010,138 @@ body::-webkit-scrollbar {
 
     .markdown-content table tr:nth-child(even) {
         background: rgba(255, 255, 255, 0.04);
+    }
+}
+
+/* Screenshots container */
+.screenshots-container {
+    margin: 12px 18px;
+    padding: 12px;
+    background: rgba(240, 240, 245, 0.5);
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.screenshots-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.screenshots-count {
+    font-size: 12px;
+    font-weight: 500;
+    color: #666;
+}
+
+.clear-screenshots-button {
+    padding: 4px 10px;
+    font-size: 11px;
+    background: rgba(255, 100, 100, 0.1);
+    border: 1px solid rgba(255, 100, 100, 0.2);
+    border-radius: 6px;
+    color: #d44;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.clear-screenshots-button:hover {
+    background: rgba(255, 100, 100, 0.15);
+    border-color: rgba(255, 100, 100, 0.3);
+}
+
+.clear-screenshots-button:active {
+    transform: scale(0.95);
+}
+
+.screenshots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+}
+
+.screenshot-thumbnail {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.screenshot-thumbnail:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.screenshot-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.remove-screenshot-button {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    background: rgba(255, 100, 100, 0.9);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+.screenshot-thumbnail:hover .remove-screenshot-button {
+    opacity: 1;
+}
+
+.remove-screenshot-button:hover {
+    background: rgba(255, 80, 80, 1);
+    transform: scale(1.1);
+}
+
+.remove-screenshot-button:active {
+    transform: scale(0.95);
+}
+
+@media (prefers-color-scheme: dark) {
+    .screenshots-container {
+        background: rgba(40, 40, 45, 0.5);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .screenshots-count {
+        color: #aaa;
+    }
+
+    .clear-screenshots-button {
+        background: rgba(255, 120, 120, 0.15);
+        border-color: rgba(255, 120, 120, 0.25);
+        color: #f77;
+    }
+
+    .clear-screenshots-button:hover {
+        background: rgba(255, 120, 120, 0.2);
+        border-color: rgba(255, 120, 120, 0.35);
+    }
+
+    .screenshot-thumbnail {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .screenshot-thumbnail:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
 }

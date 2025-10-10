@@ -6,9 +6,15 @@ export interface StreamCallbacks {
   onDone: () => void;
 }
 
+export type MessageContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+export type MessageContent = string | MessageContentPart[];
+
 export interface Message {
   role: "user" | "assistant" | "system";
-  content: string;
+  content: MessageContent;
 }
 
 export async function streamAiResponse(
@@ -16,6 +22,7 @@ export async function streamAiResponse(
   apiKey: string,
   modelName: string,
   messages: Message[],
+  screenshots: string[],
   callbacks: StreamCallbacks,
 ): Promise<void> {
   const { onChunk, onError, onDone } = callbacks;
@@ -35,6 +42,7 @@ export async function streamAiResponse(
       apiKey,
       modelName,
       messages,
+      screenshots,
       channel,
     });
 

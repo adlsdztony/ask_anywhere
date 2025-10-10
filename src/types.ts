@@ -11,6 +11,7 @@ export interface ModelConfig {
   base_url: string;
   api_key: string;
   model_name: string;
+  supports_vision?: boolean;
 }
 
 export interface QuestionTemplate {
@@ -24,4 +25,5 @@ export interface QuestionTemplate {
 
 export interface HotkeyConfig {
   popup_hotkey: string;
+  screenshot_hotkey?: string;
 }

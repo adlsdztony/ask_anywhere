@@ -56,7 +56,7 @@ export default function ConfigPage() {
   const updateModel = (
     index: number,
     field: keyof ModelConfig,
-    value: string,
+    value: string | boolean,
   ) => {
     if (!config) return;
     const newModels = [...config.models];
@@ -230,6 +230,23 @@ export default function ConfigPage() {
                     placeholder="gpt-3.5-turbo"
                   />
                 </div>
+                <div className="form-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={model.supports_vision || false}
+                      onChange={(e) =>
+                        updateModel(index, "supports_vision", e.target.checked)
+                      }
+                    />
+                    <span>Supports Vision/Images</span>
+                  </label>
+                  <p className="help-text">
+                    Enable this for models that support image inputs (e.g.,
+                    GPT-4o, GPT-4 Vision, Claude 3 Opus/Sonnet, Gemini Pro
+                    Vision).
+                  </p>
+                </div>
               </div>
             ))}
           </div>
@@ -288,7 +305,9 @@ export default function ConfigPage() {
                     }
                   >
                     <option value="none">None - Keep popup open</option>
-                    <option value="copy">Copy - Copy response to clipboard</option>
+                    <option value="copy">
+                      Copy - Copy response to clipboard
+                    </option>
                     <option value="replace">
                       Replace - Replace selected text with response
                     </option>
@@ -332,9 +351,10 @@ export default function ConfigPage() {
                     <span>Run in background (no popup window)</span>
                   </label>
                   <p className="help-text">
-                    When enabled, pressing the hotkey will execute the template in
-                    the background without showing the popup window. The result
-                    will automatically perform the configured action (copy/replace).
+                    When enabled, pressing the hotkey will execute the template
+                    in the background without showing the popup window. The
+                    result will automatically perform the configured action
+                    (copy/replace).
                   </p>
                 </div>
               </div>
@@ -359,10 +379,34 @@ export default function ConfigPage() {
                     },
                   })
                 }
-                placeholder="CommandOrControl+Shift+Space"
+                placeholder="Alt+S"
               />
               <p className="help-text">
-                Examples: CommandOrControl+Shift+Space, Alt+Q, Ctrl+Shift+A
+                Hotkey to open the popup window with captured text.
+                <br />
+                Examples: Alt+S, Ctrl+Shift+A, CommandOrControl+Q
+              </p>
+            </div>
+            <div className="form-group">
+              <label>Screenshot Hotkey:</label>
+              <input
+                type="text"
+                value={config.hotkeys.screenshot_hotkey || "Alt+Shift+S"}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    hotkeys: {
+                      ...config.hotkeys,
+                      screenshot_hotkey: e.target.value,
+                    },
+                  })
+                }
+                placeholder="Alt+Shift+S"
+              />
+              <p className="help-text">
+                Hotkey to capture a screenshot and open the popup window.
+                <br />
+                Examples: Alt+Shift+S, Ctrl+Shift+C, CommandOrControl+Shift+P
                 <br />
                 Hotkeys will be automatically registered when you save the
                 configuration.

@@ -22,6 +22,8 @@ pub struct ModelConfig {
     pub base_url: String,
     pub api_key: String,
     pub model_name: String,
+    #[serde(default)]
+    pub supports_vision: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,6 +46,12 @@ fn default_template_action() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HotkeyConfig {
     pub popup_hotkey: String,
+    #[serde(default = "default_screenshot_hotkey")]
+    pub screenshot_hotkey: String,
+}
+
+fn default_screenshot_hotkey() -> String {
+    "Alt+Shift+S".to_string()
 }
 
 impl Default for AppConfig {
@@ -54,6 +62,7 @@ impl Default for AppConfig {
                 base_url: "https://api.openai.com/v1".to_string(),
                 api_key: String::new(),
                 model_name: "gpt-4.1".to_string(),
+                supports_vision: false,
             }],
             templates: vec![
                 QuestionTemplate {
@@ -83,6 +92,7 @@ impl Default for AppConfig {
             ],
             hotkeys: HotkeyConfig {
                 popup_hotkey: "Alt+S".to_string(),
+                screenshot_hotkey: "Alt+Shift+S".to_string(),
             },
             selected_model_index: 0,
             autostart: false,
@@ -98,6 +108,7 @@ impl Default for ModelConfig {
             base_url: "https://api.openai.com/v1".to_string(),
             api_key: String::new(),
             model_name: "gpt-4.1".to_string(),
+            supports_vision: false,
         }
     }
 }

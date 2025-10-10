@@ -14,6 +14,10 @@ import {
   setPopupPinned,
   isPopupPinned,
   replaceTextInSource,
+  getScreenshots,
+  takeScreenshot,
+  clearScreenshots,
+  removeScreenshot,
 } from "../api";
 import {
   streamAiResponse,
@@ -84,6 +88,7 @@ function CodeBlock({ children }: { children: React.ReactNode }) {
 interface Message {
   role: "user" | "assistant";
   content: string;
+  images?: string[]; // Base64 image data URLs
 }
 
 export default function PopupWindow() {
@@ -97,6 +102,7 @@ export default function PopupWindow() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [isPinned, setIsPinned] = useState(false);
+  const [screenshots, setScreenshots] = useState<string[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -231,6 +237,35 @@ export default function PopupWindow() {
     }
   }, [messages.length]);
 
+  // Auto-switch to vision-capable model when screenshots are added
+  useEffect(() => {
+    if (!config) return;
+
+    // If screenshots exist and current model doesn't support vision
+    if (screenshots.length > 0) {
+      const currentModel = config.models[config.selected_model_index];
+
+      if (!currentModel?.supports_vision) {
+        // Find first vision-capable model
+        const visionModelIndex = config.models.findIndex(
+          (model) => model.supports_vision,
+        );
+
+        if (visionModelIndex !== -1) {
+          // Switch to vision-capable model
+          const newConfig = {
+            ...config,
+            selected_model_index: visionModelIndex,
+          };
+          setConfig(newConfig);
+          console.log(
+            `Auto-switched to vision-capable model: ${config.models[visionModelIndex].name}`,
+          );
+        }
+      }
+    }
+  }, [screenshots.length, config]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -288,6 +323,10 @@ export default function PopupWindow() {
         setMessages([{ role: "user", content: capturedText }]);
       }
 
+      // Load screenshots
+      const loadedScreenshots = await getScreenshots();
+      setScreenshots(loadedScreenshots);
+
       // Load pinned state
       const pinned = await isPopupPinned();
       setIsPinned(pinned);
@@ -312,6 +351,14 @@ export default function PopupWindow() {
     const selectedModel = config.models[config.selected_model_index];
     if (!selectedModel.api_key) {
       setError("Please configure an API key in settings first.");
+      return;
+    }
+
+    // Check if model supports vision when screenshots are present
+    if (screenshots.length > 0 && !selectedModel.supports_vision) {
+      setError(
+        `Model "${selectedModel.name}" does not support images. Please select a vision-capable model or remove images.`,
+      );
       return;
     }
 
@@ -385,8 +432,22 @@ export default function PopupWindow() {
     );
     console.log("=====================");
 
-    // Add user message to UI immediately
-    setMessages((prev) => [{ role: "user", content: finalPrompt }, ...prev]);
+    // Add user message to UI immediately with images if present
+    const userMessage: Message = {
+      role: "user",
+      content: finalPrompt,
+      images: screenshots.length > 0 ? [...screenshots] : undefined,
+    };
+    setMessages((prev) => [userMessage, ...prev]);
+
+    // Clear screenshots immediately after adding to message
+    const screenshotsForApi = [...screenshots];
+    try {
+      await clearScreenshots();
+      setScreenshots([]);
+    } catch (err) {
+      console.error("Failed to clear screenshots:", err);
+    }
 
     try {
       let accumulatedResponse = "";
@@ -395,6 +456,7 @@ export default function PopupWindow() {
         selectedModel.api_key,
         selectedModel.model_name,
         conversationMessages,
+        screenshotsForApi,
         {
           onChunk: (chunk) => {
             accumulatedResponse += chunk;
@@ -488,6 +550,39 @@ export default function PopupWindow() {
 
     // Focus input after clicking
     inputRef.current?.focus();
+  };
+
+  const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    // Look for image items in clipboard
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+
+      if (item.type.startsWith("image/")) {
+        e.preventDefault(); // Prevent default paste behavior for images
+
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        try {
+          // Read file as data URL
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+            const dataUrl = event.target?.result as string;
+            if (dataUrl) {
+              // Add to screenshots
+              setScreenshots((prev) => [...prev, dataUrl]);
+            }
+          };
+          reader.readAsDataURL(file);
+        } catch (err) {
+          console.error("Failed to read pasted image:", err);
+          setError("Failed to paste image");
+        }
+      }
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -598,6 +693,47 @@ export default function PopupWindow() {
     }
   };
 
+  const handleTakeScreenshot = async () => {
+    try {
+      const screenshot = await takeScreenshot();
+      setScreenshots((prev) => [...prev, screenshot]);
+    } catch (err) {
+      console.error("Failed to take screenshot:", err);
+      setError("Failed to take screenshot");
+    }
+  };
+
+  const handleRemoveScreenshot = async (index: number) => {
+    try {
+      await removeScreenshot(index);
+      setScreenshots((prev) => prev.filter((_, i) => i !== index));
+    } catch (err) {
+      console.error("Failed to remove screenshot:", err);
+    }
+  };
+
+  const handleClearAllScreenshots = async () => {
+    try {
+      await clearScreenshots();
+      setScreenshots([]);
+    } catch (err) {
+      console.error("Failed to clear screenshots:", err);
+    }
+  };
+
+  // Filter models based on screenshots presence
+  const getAvailableModels = () => {
+    if (!config) return [];
+
+    // If there are screenshots, only show vision-capable models
+    if (screenshots.length > 0) {
+      return config.models.filter((model) => model.supports_vision);
+    }
+
+    // Otherwise show all models
+    return config.models;
+  };
+
   const handleContainerMouseDown = async (e: React.MouseEvent) => {
     // Only handle dragging if clicking on the container itself, not its children
     const target = e.target as HTMLElement;
@@ -664,6 +800,7 @@ export default function PopupWindow() {
             value={customPrompt}
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder="Ask anything or type / for templates..."
             disabled={isStreaming}
           />
@@ -679,22 +816,41 @@ export default function PopupWindow() {
             </button>
             {isDropdownOpen && (
               <div className="dropdown-menu">
-                {config.models.map((model, index) => (
-                  <div
-                    key={index}
-                    className={`dropdown-item ${index === config.selected_model_index ? "active" : ""}`}
-                    onClick={() => {
-                      const newConfig = {
-                        ...config,
-                        selected_model_index: index,
-                      };
-                      setConfig(newConfig);
-                      setIsDropdownOpen(false);
-                    }}
-                  >
-                    {model.name}
-                  </div>
-                ))}
+                {getAvailableModels().map((model) => {
+                  // Find the actual index in the full config.models array
+                  const actualIndex = config.models.findIndex(
+                    (m) =>
+                      m.name === model.name &&
+                      m.model_name === model.model_name,
+                  );
+                  return (
+                    <div
+                      key={actualIndex}
+                      className={`dropdown-item ${actualIndex === config.selected_model_index ? "active" : ""}`}
+                      onClick={() => {
+                        const newConfig = {
+                          ...config,
+                          selected_model_index: actualIndex,
+                        };
+                        setConfig(newConfig);
+                        setIsDropdownOpen(false);
+                      }}
+                    >
+                      {model.name}
+                      {model.supports_vision && (
+                        <span className="vision-badge" title="Supports images">
+                          👁️
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+                {screenshots.length > 0 &&
+                  getAvailableModels().length === 0 && (
+                    <div className="dropdown-item disabled">
+                      No vision-capable models configured
+                    </div>
+                  )}
               </div>
             )}
           </div>
@@ -727,7 +883,72 @@ export default function PopupWindow() {
               )}
             </svg>
           </button>
+          <button
+            className="camera-button"
+            onClick={handleTakeScreenshot}
+            disabled={isStreaming}
+            type="button"
+            title="Take screenshot"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
+          </button>
         </div>
+
+        {screenshots.length > 0 && (
+          <div className="screenshots-container">
+            <div className="screenshots-header">
+              <span className="screenshots-count">
+                {screenshots.length} screenshot
+                {screenshots.length !== 1 ? "s" : ""}
+              </span>
+              <button
+                className="clear-screenshots-button"
+                onClick={handleClearAllScreenshots}
+                type="button"
+              >
+                Clear all
+              </button>
+            </div>
+            <div className="screenshots-grid">
+              {screenshots.map((screenshot, index) => (
+                <div key={index} className="screenshot-thumbnail">
+                  <img src={screenshot} alt={`Screenshot ${index + 1}`} />
+                  <button
+                    className="remove-screenshot-button"
+                    onClick={() => handleRemoveScreenshot(index)}
+                    type="button"
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {showSuggestions && getFilteredTemplates().length > 0 && (
           <div className="suggestions-menu" ref={suggestionsRef}>
@@ -899,7 +1120,21 @@ export default function PopupWindow() {
                       </ReactMarkdown>
                     </>
                   ) : (
-                    <div className="user-message-text">{message.content}</div>
+                    <>
+                      {message.images && message.images.length > 0 && (
+                        <div className="message-images">
+                          {message.images.map((image, imgIndex) => (
+                            <img
+                              key={imgIndex}
+                              src={image}
+                              alt={`Attached image ${imgIndex + 1}`}
+                              className="message-image"
+                            />
+                          ))}
+                        </div>
+                      )}
+                      <div className="user-message-text">{message.content}</div>
+                    </>
                   )}
                 </div>
               </div>

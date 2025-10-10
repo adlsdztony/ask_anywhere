@@ -1,5 +1,6 @@
 mod clipboard;
 mod config;
+mod screenshot;
 
 use auto_launch::AutoLaunch;
 use config::AppConfig;
@@ -19,6 +20,9 @@ struct CapturedText(Arc<Mutex<String>>);
 
 // Popup pinned state
 struct PopupPinned(Arc<Mutex<bool>>);
+
+// Screenshots state
+struct Screenshots(Arc<Mutex<Vec<String>>>);
 
 // Tauri commands
 
@@ -72,6 +76,50 @@ async fn reload_hotkeys(app: AppHandle) -> Result<(), String> {
 
         // Unregister all existing shortcuts
         let _ = app.global_shortcut().unregister_all();
+
+        // Re-register screenshot hotkey
+        let screenshot_shortcut_str = config.hotkeys.screenshot_hotkey.as_str();
+        let screenshot_shortcut: Shortcut = screenshot_shortcut_str
+            .parse()
+            .map_err(|e| format!("Failed to parse screenshot shortcut: {:?}", e))?;
+
+        let app_for_screenshot = app.clone();
+        match app.global_shortcut().on_shortcut(
+            screenshot_shortcut.clone(),
+            move |_app, _shortcut, event| {
+                if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                    let app = app_for_screenshot.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let screenshot_state: tauri::State<Screenshots> = app.state();
+                        match screenshot::capture_screenshot().await {
+                            Ok(screenshot_data) => {
+                                {
+                                    let mut screenshots = screenshot_state.0.lock().await;
+                                    screenshots.push(screenshot_data);
+                                    println!("Screenshot captured successfully");
+                                }
+                                let _ = show_popup_window(app).await;
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to capture screenshot: {}", e);
+                            }
+                        }
+                    });
+                }
+            },
+        ) {
+            Ok(_) => {
+                if let Err(e) = app.global_shortcut().register(screenshot_shortcut) {
+                    eprintln!("Warning: Failed to register screenshot shortcut: {}", e);
+                }
+            }
+            Err(e) => {
+                eprintln!(
+                    "Warning: Failed to setup screenshot shortcut handler: {}",
+                    e
+                );
+            }
+        }
 
         // Re-register popup hotkey
         let shortcut_str = config.hotkeys.popup_hotkey.as_str();
@@ -314,6 +362,42 @@ async fn get_captured_text(state: State<'_, CapturedText>) -> Result<String, Str
     Ok(text.clone())
 }
 
+#[tauri::command]
+async fn take_screenshot(state: State<'_, Screenshots>) -> Result<String, String> {
+    // Capture screenshot
+    let screenshot_data = screenshot::capture_screenshot().await?;
+
+    // Store in state
+    let mut screenshots = state.0.lock().await;
+    screenshots.push(screenshot_data.clone());
+
+    Ok(screenshot_data)
+}
+
+#[tauri::command]
+async fn get_screenshots(state: State<'_, Screenshots>) -> Result<Vec<String>, String> {
+    let screenshots = state.0.lock().await;
+    Ok(screenshots.clone())
+}
+
+#[tauri::command]
+async fn clear_screenshots(state: State<'_, Screenshots>) -> Result<(), String> {
+    let mut screenshots = state.0.lock().await;
+    screenshots.clear();
+    Ok(())
+}
+
+#[tauri::command]
+async fn remove_screenshot(state: State<'_, Screenshots>, index: usize) -> Result<(), String> {
+    let mut screenshots = state.0.lock().await;
+    if index < screenshots.len() {
+        screenshots.remove(index);
+        Ok(())
+    } else {
+        Err("Screenshot index out of bounds".to_string())
+    }
+}
+
 // Helper function to create AutoLaunch instance
 fn create_auto_launch() -> Result<AutoLaunch, String> {
     let app_name = "AskAnywhere";
@@ -355,6 +439,7 @@ async fn stream_ai_response(
     api_key: String,
     model_name: String,
     messages: Vec<serde_json::Value>,
+    screenshots: Vec<String>,
     channel: Channel<String>,
 ) -> Result<(), String> {
     use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
@@ -375,10 +460,42 @@ async fn stream_ai_response(
         HeaderValue::from_str(&format!("Bearer {}", api_key)).map_err(|e| e.to_string())?,
     );
 
+    // Transform messages if screenshots are provided
+    let transformed_messages = if !screenshots.is_empty() {
+        messages
+            .into_iter()
+            .map(|mut msg| {
+                // Only transform user messages
+                if msg.get("role").and_then(|r| r.as_str()) == Some("user") {
+                    if let Some(content) = msg.get("content").and_then(|c| c.as_str()) {
+                        // Build content array with text and images
+                        let mut content_parts: Vec<serde_json::Value> =
+                            vec![json!({"type": "text", "text": content})];
+
+                        // Add all screenshots as image_url parts
+                        for screenshot in &screenshots {
+                            content_parts.push(json!({
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": screenshot
+                                }
+                            }));
+                        }
+
+                        msg["content"] = json!(content_parts);
+                    }
+                }
+                msg
+            })
+            .collect()
+    } else {
+        messages
+    };
+
     // Build request body
     let body = json!({
         "model": model_name,
-        "messages": messages,
+        "messages": transformed_messages,
         "stream": true
     });
 
@@ -789,6 +906,8 @@ pub fn run() {
             app.manage(CapturedText(Arc::new(Mutex::new(String::new()))));
             // Initialize popup pinned state
             app.manage(PopupPinned(Arc::new(Mutex::new(false))));
+            // Initialize screenshots state
+            app.manage(Screenshots(Arc::new(Mutex::new(Vec::new()))));
 
             // Load config to get autostart state
             let store = app.store("config.json")?;
@@ -937,6 +1056,50 @@ pub fn run() {
                     Err(e) => {
                         eprintln!("Warning: Failed to setup shortcut handler: {}. The shortcut may not work.", e);
                         // Don't fail the app startup, just log the error
+                    }
+                }
+
+                // Register screenshot hotkey from config
+                let screenshot_shortcut_str = config.hotkeys.screenshot_hotkey.as_str();
+                let screenshot_shortcut: Shortcut = screenshot_shortcut_str
+                    .parse()
+                    .map_err(|e| format!("Failed to parse screenshot shortcut: {:?}", e))?;
+
+                let app_for_screenshot = app.handle().clone();
+                match app.global_shortcut().on_shortcut(
+                    screenshot_shortcut.clone(),
+                    move |_app, _shortcut, event| {
+                        if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                            let app = app_for_screenshot.clone();
+                            tauri::async_runtime::spawn(async move {
+                                // Take screenshot and store it
+                                let screenshot_state: tauri::State<Screenshots> = app.state();
+                                match screenshot::capture_screenshot().await {
+                                    Ok(screenshot_data) => {
+                                        {
+                                            let mut screenshots = screenshot_state.0.lock().await;
+                                            screenshots.push(screenshot_data);
+                                            println!("Screenshot captured successfully");
+                                        } // Drop the mutex guard here
+
+                                        // Show the popup window
+                                        let _ = show_popup_window(app).await;
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Failed to capture screenshot: {}", e);
+                                    }
+                                }
+                            });
+                        }
+                    },
+                ) {
+                    Ok(_) => {
+                        if let Err(e) = app.global_shortcut().register(screenshot_shortcut) {
+                            eprintln!("Warning: Failed to register screenshot shortcut: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: Failed to setup screenshot shortcut handler: {}", e);
                     }
                 }
 
@@ -1145,6 +1308,10 @@ pub fn run() {
             set_popup_pinned,
             is_popup_pinned,
             replace_text_in_source,
+            take_screenshot,
+            get_screenshots,
+            clear_screenshots,
+            remove_screenshot,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

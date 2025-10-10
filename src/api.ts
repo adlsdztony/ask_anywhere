@@ -39,3 +39,20 @@ export async function isPopupPinned(): Promise<boolean> {
 export async function replaceTextInSource(text: string): Promise<void> {
   await invoke("replace_text_in_source", { text });
 }
+
+// Screenshot API functions
+export async function takeScreenshot(): Promise<string> {
+  return await invoke<string>("take_screenshot");
+}
+
+export async function getScreenshots(): Promise<string[]> {
+  return await invoke<string[]>("get_screenshots");
+}
+
+export async function clearScreenshots(): Promise<void> {
+  await invoke("clear_screenshots");
+}
+
+export async function removeScreenshot(index: number): Promise<void> {
+  await invoke("remove_screenshot", { index });
+}
