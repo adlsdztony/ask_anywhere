@@ -73,6 +73,17 @@ canvas.addEventListener("mouseup", async () => {
   }
 
   try {
+    // Hide all UI elements before capturing
+    selectionBox.style.display = "none";
+    selectionInfo.style.display = "none";
+    hint.style.display = "none";
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Wait a bit for UI to hide completely
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
     // Get the device pixel ratio from browser (works without special permissions)
     const scaleFactor = window.devicePixelRatio || 1;
 
