@@ -3,7 +3,7 @@ mod config;
 mod screenshot;
 
 use auto_launch::AutoLaunch;
-use config::AppConfig;
+use config::{AppConfig, QuestionTemplate};
 use enigo::Direction::{Click, Press, Release};
 use enigo::{Enigo, Key, Keyboard, Settings};
 use futures::StreamExt;
@@ -61,6 +61,46 @@ async fn save_config(app: AppHandle, config: AppConfig) -> Result<(), String> {
 
     // Reload hotkeys after saving config
     reload_hotkeys(app).await?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn export_config(app: AppHandle) -> Result<String, String> {
+    let config = load_config(app).await?;
+
+    // Only export templates
+    serde_json::to_string_pretty(&config.templates)
+        .map_err(|e| format!("Failed to serialize templates: {}", e))
+}
+
+#[tauri::command]
+async fn import_config(app: AppHandle, config_json: String) -> Result<(), String> {
+    // Parse the JSON string to validate it as templates
+    let new_templates: Vec<QuestionTemplate> = serde_json::from_str(&config_json)
+        .map_err(|e| format!("Invalid templates format: {}", e))?;
+
+    // Load current config
+    let mut config = load_config(app.clone()).await?;
+
+    // Merge templates by ID
+    for new_template in new_templates {
+        // Find if a template with the same ID exists
+        if let Some(existing) = config
+            .templates
+            .iter_mut()
+            .find(|t| t.id == new_template.id)
+        {
+            // Update existing template
+            *existing = new_template;
+        } else {
+            // Add new template
+            config.templates.push(new_template);
+        }
+    }
+
+    // Save the updated config
+    save_config(app, config).await?;
 
     Ok(())
 }
@@ -1358,9 +1398,13 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             load_config,
             save_config,
+            export_config,
+            import_config,
             reload_hotkeys,
             get_captured_text,
             show_popup_window,

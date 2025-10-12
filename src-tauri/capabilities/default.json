@@ -23,6 +23,9 @@
     "store:allow-set",
     "store:allow-save",
     "store:allow-load",
-    "store:default"
+    "store:default",
+    "dialog:default",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file"
   ]
 }

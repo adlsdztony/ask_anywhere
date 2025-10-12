@@ -74,3 +74,11 @@ export async function captureScreenshotRegion(
 export async function showScreenshotSelector(): Promise<void> {
   await invoke("show_screenshot_selector");
 }
+
+export async function exportConfig(): Promise<string> {
+  return await invoke<string>("export_config");
+}
+
+export async function importConfig(configJson: string): Promise<void> {
+  await invoke("import_config", { configJson });
+}

@@ -28,15 +28,25 @@
     color: #333;
 }
 
-.save-button {
+.header-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.save-button,
+.export-button,
+.import-button {
     padding: 10px 24px;
-    background: #007bff;
     color: white;
     border: none;
     border-radius: 6px;
     font-size: 14px;
     cursor: pointer;
     transition: background 0.2s;
+}
+
+.save-button {
+    background: #007bff;
 }
 
 .save-button:hover:not(:disabled) {
@@ -46,6 +56,22 @@
 .save-button:disabled {
     background: #ccc;
     cursor: not-allowed;
+}
+
+.export-button {
+    background: #28a745;
+}
+
+.export-button:hover {
+    background: #218838;
+}
+
+.import-button {
+    background: #6c757d;
+}
+
+.import-button:hover {
+    background: #5a6268;
 }
 
 .tabs {
@@ -92,6 +118,11 @@
     margin: 0;
     font-size: 20px;
     color: #333;
+}
+
+.section-actions {
+    display: flex;
+    gap: 12px;
 }
 
 .add-button {
@@ -317,6 +348,22 @@
         background: #0a58ca;
     }
 
+    .export-button {
+        background: #198754;
+    }
+
+    .export-button:hover {
+        background: #157347;
+    }
+
+    .import-button {
+        background: #6c757d;
+    }
+
+    .import-button:hover {
+        background: #565e64;
+    }
+
     .tabs {
         background: #1e1e1e;
         border-bottom: 1px solid #404040;
@@ -357,7 +404,9 @@
     }
 
     .model-select select {
-        background: #1e1e1e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e0e0e0' d='M6 9L1 4h10z'/%3E%3C/svg%3E") no-repeat right 10px center;
+        background: #1e1e1e
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e0e0e0' d='M6 9L1 4h10z'/%3E%3C/svg%3E")
+            no-repeat right 10px center;
         border: 1px solid #404040;
         color: #e0e0e0;
     }
@@ -405,7 +454,9 @@
     }
 
     .form-group select {
-        background: #1e1e1e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e0e0e0' d='M6 9L1 4h10z'/%3E%3C/svg%3E") no-repeat right 10px center;
+        background: #1e1e1e
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e0e0e0' d='M6 9L1 4h10z'/%3E%3C/svg%3E")
+            no-repeat right 10px center;
         border: 1px solid #404040;
         color: #e0e0e0;
     }

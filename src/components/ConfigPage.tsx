@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
-import { loadConfig, saveConfig } from "../api";
+import { loadConfig, saveConfig, exportConfig, importConfig } from "../api";
 import type { AppConfig, ModelConfig, QuestionTemplate } from "../types";
+import { save, open } from "@tauri-apps/plugin-dialog";
+import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
 import "./ConfigPage.css";
 
 export default function ConfigPage() {
@@ -39,6 +41,113 @@ export default function ConfigPage() {
       alert("Failed to save configuration");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      console.log("Starting export...");
+      const configJson = await exportConfig();
+      console.log("Config loaded, length:", configJson.length);
+
+      // Use Tauri's save dialog
+      console.log("Opening save dialog...");
+      const filePath = await save({
+        defaultPath: `ask-anywhere-templates-${new Date().toISOString().split("T")[0]}.json`,
+        filters: [
+          {
+            name: "JSON",
+            extensions: ["json"],
+          },
+        ],
+      });
+      console.log("File path selected:", filePath);
+
+      if (filePath) {
+        console.log("Writing file...");
+        await writeTextFile(filePath, configJson);
+        console.log("File written successfully");
+        alert(`Templates exported successfully to:\n${filePath}`);
+      } else {
+        console.log("User cancelled the dialog");
+      }
+    } catch (error) {
+      console.error("Failed to export templates:", error);
+      alert(`Failed to export templates: ${error}`);
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      console.log("Starting import...");
+      // Use Tauri's open dialog
+      console.log("Opening file dialog...");
+      const filePath = await open({
+        multiple: false,
+        filters: [
+          {
+            name: "JSON",
+            extensions: ["json"],
+          },
+        ],
+      });
+      console.log("File path selected:", filePath);
+
+      if (filePath) {
+        console.log("Reading file...");
+        const configJson = await readTextFile(filePath as string);
+        console.log("File content length:", configJson.length);
+
+        console.log("Importing templates...");
+        await importConfig(configJson);
+
+        // Reload the configuration to update the UI
+        console.log("Reloading configuration...");
+        await loadConfiguration();
+
+        alert(
+          "Templates imported/merged successfully!\nExisting templates with same ID were updated, new templates were added.\nThe page will reload.",
+        );
+        window.location.reload();
+      } else {
+        console.log("User cancelled the dialog");
+      }
+    } catch (error) {
+      console.error("Failed to import templates:", error);
+      alert(`Failed to import templates: ${error}`);
+    }
+  };
+
+  const handleImportFromUrl = async () => {
+    const url = prompt("Enter the URL to import templates from:");
+    if (!url) return;
+
+    try {
+      console.log("Importing from URL:", url);
+
+      // Fetch the JSON from the URL
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const configJson = await response.text();
+      console.log("Downloaded content length:", configJson.length);
+
+      console.log("Importing templates...");
+      await importConfig(configJson);
+
+      // Reload the configuration to update the UI
+      console.log("Reloading configuration...");
+      await loadConfiguration();
+
+      alert(
+        "Templates imported/merged successfully from URL!\nExisting templates with same ID were updated, new templates were added.\nThe page will reload.",
+      );
+      window.location.reload();
+    } catch (error) {
+      console.error("Failed to import templates from URL:", error);
+      alert(`Failed to import templates from URL: ${error}`);
     }
   };
 
@@ -256,9 +365,20 @@ export default function ConfigPage() {
           <div className="templates-section">
             <div className="section-header">
               <h2>Question Templates</h2>
-              <button onClick={addTemplate} className="add-button">
-                Add Template
-              </button>
+              <div className="section-actions">
+                <button onClick={handleImport} className="import-button">
+                  Import from File
+                </button>
+                <button onClick={handleImportFromUrl} className="import-button">
+                  Import from URL
+                </button>
+                <button onClick={handleExport} className="export-button">
+                  Export Templates
+                </button>
+                <button onClick={addTemplate} className="add-button">
+                  Add Template
+                </button>
+              </div>
             </div>
 
             {config.templates.map((template, index) => (
