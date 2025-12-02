@@ -7,6 +7,8 @@ use config::{AppConfig, QuestionTemplate};
 use enigo::Direction::{Click, Press, Release};
 use enigo::{Enigo, Key, Keyboard, Settings};
 use futures::StreamExt;
+use simplelog::*;
+use std::fs::File;
 use std::sync::Arc;
 use tauri::ipc::Channel;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem};
@@ -23,6 +25,9 @@ struct PopupPinned(Arc<Mutex<bool>>);
 
 // Screenshots state
 struct Screenshots(Arc<Mutex<Vec<String>>>);
+
+// App exiting state
+struct AppExiting(Arc<Mutex<bool>>);
 
 // Tauri commands
 
@@ -1013,12 +1018,34 @@ async fn resize_popup_window(app: AppHandle, width: f64, height: f64) -> Result<
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
+            // Initialize logging
+            #[cfg(debug_assertions)]
+            {
+                let log_config = ConfigBuilder::new()
+                    .set_time_format_rfc3339()
+                    .build();
+
+                let _ = WriteLogger::init(
+                    LevelFilter::Debug,
+                    log_config,
+                    File::create("ask_anywhere_debug.log").unwrap_or_else(|_| File::create("ask_anywhere_debug.log.fallback").unwrap()),
+                );
+
+                std::panic::set_hook(Box::new(|info| {
+                    log::error!("Panic occurred: {:?}", info);
+                }));
+
+                log::info!("Application started");
+            }
+
             // Initialize captured text state
             app.manage(CapturedText(Arc::new(Mutex::new(String::new()))));
             // Initialize popup pinned state
             app.manage(PopupPinned(Arc::new(Mutex::new(false))));
             // Initialize screenshots state
             app.manage(Screenshots(Arc::new(Mutex::new(Vec::new()))));
+            // Initialize app exiting state
+            app.manage(AppExiting(Arc::new(Mutex::new(false))));
 
             // Load config to get autostart state
             let store = app.store("config.json")?;
@@ -1063,7 +1090,12 @@ pub fn run() {
                         app.restart();
                     }
                     "exit" => {
-                        app.exit(0);
+                        let app_clone = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let state: State<AppExiting> = app_clone.state();
+                            *state.0.lock().await = true;
+                            app_clone.exit(0);
+                        });
                     }
                     _ => {}
                 })
@@ -1422,6 +1454,26 @@ pub fn run() {
             remove_screenshot,
             show_screenshot_selector,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            match event {
+                tauri::RunEvent::ExitRequested { api, .. } => {
+                    let should_exit = match app_handle.state::<AppExiting>().0.try_lock() {
+                        Ok(guard) => *guard,
+                        Err(_) => false,
+                    };
+
+                    if !should_exit {
+                        api.prevent_exit();
+                        #[cfg(debug_assertions)]
+                        log::warn!("Exit requested but prevented (background mode)");
+                    } else {
+                        #[cfg(debug_assertions)]
+                        log::info!("App exiting normally");
+                    }
+                }
+                _ => {}
+            }
+        });
 }
