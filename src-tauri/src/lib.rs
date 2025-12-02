@@ -7,8 +7,6 @@ use config::{AppConfig, QuestionTemplate};
 use enigo::Direction::{Click, Press, Release};
 use enigo::{Enigo, Key, Keyboard, Settings};
 use futures::StreamExt;
-use simplelog::*;
-use std::fs::File;
 use std::sync::Arc;
 use tauri::ipc::Channel;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem};
